@@ -1,23 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
-export const Route = createFileRoute("/")({
+import { createFileRoute } from '@tanstack/react-router';
+import FieldsApp from '@/components/fields/FieldsApp';
+import { ApiRuntime } from '@/services/api/context';
+import { ru } from '@/i18n/ru';
+export const Route = createFileRoute('/')({
+  head: () => ({ meta: [{title: `${ru.title} — контуры полей Sentinel-2`},{name:'description',content:ru.explanation},{property:'og:title',content:ru.title},{property:'og:description',content:ru.explanation},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary_large_image'}] }),
   component: Index,
 });
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
+function Index() { return <ApiRuntime><FieldsApp /></ApiRuntime>; }

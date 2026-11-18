@@ -1,0 +1,31 @@
+export const ru = {
+  title: 'Поля по клику', subtitle: 'Границы полей из космоса',
+  explanation: 'Выберите точку и дату — модель найдёт безоблачный снимок Sentinel-2 и вернёт контуры полей ячейки 10 км',
+  warning: 'Модель обучена на данных США, в других регионах качество не проверено.',
+  where: 'Где', when: 'Когда', point: 'Точка (широта, долгота)', placeholder: 'кликните по карте или вставьте 44.91280, -90.77650',
+  coordinateError: 'Не понял координаты: нужно «широта, долгота», например 44.91280, -90.77650',
+  single: 'Одна дата', interval: 'Интервал', start: 'Начало', end: 'Конец',
+  intervalDisabled: 'Интервал появится, когда раннер научится выбирать лучший снимок за период',
+  dateOrder: 'Начало интервала позже конца', dateLength: 'Интервал — не больше года', dateInvalid: 'Даты — с 2017-01-01 по сегодня',
+  submit: 'Найти поля', calculating: 'Идёт расчёт…', choosePoint: 'Сначала выберите точку на карте',
+  empty: 'Кликните по карте, чтобы выбрать точку', emptyHistory: 'Здесь появятся ваши запросы', history: 'Мои запросы', newRequest: 'Новый запрос',
+  status: { queued: 'В очереди', locating: 'Ищу ячейку и снимок', waiting_gpu: 'Жду GPU', running: 'Считаю поля', done: 'Готово', failed: 'Ошибка', no_scene: 'Нет чистого снимка' },
+  message: { 'scene found': 'Безоблачный снимок найден', 'already computed': 'Результат уже рассчитан', 'no clear scene within ±30 days': 'Нет безоблачного снимка в пределах ±30 дней' },
+  cell: 'Ячейка', scene: 'снимок', model: 'модель', fields: 'полей', download: 'Скачать GeoJSON', hectare: 'га',
+  disconnected: 'Нет связи с сервером, повторяю…', auth: 'Нет доступа: откройте ссылку из приглашения ещё раз', login: 'Войти', retry: 'Повторить',
+  satellite: 'Спутник', satelliteSource: 'Esri World Imagery', sentinel: 'Sentinel-2', resolution: '10 м / пиксель',
+  layers: 'Слои карты', fieldLayer: 'Контуры полей', cellLayer: 'Рассчитанные ячейки', labels: 'Подписи', selected: 'Выбранная ячейка',
+  zoomIn: 'Приблизить', zoomOut: 'Отдалить', locate: 'К выбранной точке', collapse: 'Свернуть панель', expand: 'Развернуть панель',
+  zoom: 'зум', copied: 'Скопировано', copy: 'Скопировать координаты',
+  search: 'Поиск по карте', searchPlaceholder: 'Координаты или номер ячейки…', recent: 'Недавние запросы', go: 'Перейти к точке', noResults: 'Ячейка не найдена',
+  shortcuts: 'Быстрые действия', keyboard: 'Клавиши', close: 'Закрыть', helpNew: 'Новый запрос', helpSearch: 'Поиск точки или ячейки', helpClose: 'Закрыть окно',
+  webgl: 'Карта не может отрисоваться: браузер не даёт WebGL', webglHelp: 'Chrome / Brave / Edge: Настройки → Система → «Использовать графическое ускорение». Firefox: Настройки → Основные → Производительность.',
+  loading: 'Загрузка…', ready: 'Готово к расчёту', progress: 'Обычно несколько минут на ячейку', resultsReady: 'Контуры полей готовы', failedToast: 'Не удалось рассчитать поля',
+  account: 'Приглашённый аналитик', overview: 'Обзор', scale: 'км', demo: 'MOCK', date: 'Дата снимка', calendar: 'Открыть календарь',
+  season: (y: number) => `Сезон США ${y} (1 мар – 30 сен)`, year: (y: number) => `Весь ${y} год`,
+  design: 'Оформление · Поля по клику', tokens: 'Цвета', controls: 'Элементы', networkError: 'Не удалось загрузить данные',
+};
+export const formatDate = (d: string, short = false) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: short ? 'short' : 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${d}T12:00:00Z`));
+export const formatRange = (s: string, e: string) => s === e ? formatDate(s, true) : `${formatDate(s, true)} – ${formatDate(e, true)}`;
+export const formatArea = (a: number) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(a)} ${ru.hectare}`;
+export function jobMessage(message: string | null) { if (!message) return ''; return ru.message[message as keyof typeof ru.message] ?? message.replace(/(\d+) fields/, `$1 ${ru.fields}`); }

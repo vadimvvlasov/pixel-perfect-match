@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## App architecture
+- Keep TanStack routing and a browser-initialized API provider; the fixed template requires TanStack and no app backend is needed.
+- All remote service access belongs to src/services/api/http; UI consumes the API context and Query hooks to keep mock and HTTP implementations interchangeable.
+- Only MapView imports MapLibre; lazy-load it behind ClientOnly and expose an imperative handle so large GeoJSON stays outside component state.
