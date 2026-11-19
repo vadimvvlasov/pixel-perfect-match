@@ -1,78 +1,922 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ClientOnly } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDownToLine, ArrowUpRight, CalendarDays, Check, ChevronRight, Clock3, Crosshair, History, Info, Layers, Loader2, MapPin, Minus, PanelLeftClose, PanelLeftOpen, Plus, ScanLine, Search, ShieldAlert, Sparkles, UserRound, X, Keyboard, Satellite, Copy } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { ru as t, formatDate, formatRange, jobMessage } from '@/i18n/ru';
-import { parsePoint, pointText, presetRange, validateDates, isoToday, type Point } from '@/lib/field-utils';
-import { API_MODE, INTERVALS_ENABLED } from '@/config';
-import { useApi } from '@/services/api/context';
-import { useMe, useJobs, useJob, useCreateJob, useResults, useResult, useFields } from '@/services/api/hooks';
-import { AuthRequiredError, RateLimitError, ValidationError } from '@/services/api/errors';
-import { FINISHED, type Job, type JobStatus, type Bbox } from '@/services/api/types';
-import type { MapHandle } from './map-types';
-import { toast } from 'sonner';
-import { ru as dateLocale } from 'date-fns/locale';
-const MapView = lazy(() => import('./MapView'));
-export function Status({ status }: { status: JobStatus }) { return <span className={`status status-${status}`}><span className="status-dot" /><span>{t.status[status]}</span></span>; }
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { ClientOnly } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Clock3,
+  Crosshair,
+  History,
+  Info,
+  Layers,
+  Loader2,
+  MapPin,
+  Minus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  ScanLine,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  UserRound,
+  X,
+  Keyboard,
+  Satellite,
+  Copy,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { ru as t, formatDate, formatRange, jobMessage } from "@/i18n/ru";
+import {
+  parsePoint,
+  pointText,
+  presetRange,
+  validateDates,
+  isoToday,
+  type Point,
+} from "@/lib/field-utils";
+import { API_MODE, INTERVALS_ENABLED } from "@/config";
+import { useApi } from "@/services/api/context";
+import {
+  useMe,
+  useJobs,
+  useJob,
+  useCreateJob,
+  useResults,
+  useResult,
+  useFields,
+} from "@/services/api/hooks";
+import { AuthRequiredError, RateLimitError, ValidationError } from "@/services/api/errors";
+import { FINISHED, type Job, type JobStatus, type Bbox } from "@/services/api/types";
+import type { MapHandle } from "./map-types";
+import { toast } from "sonner";
+import { ru as dateLocale } from "date-fns/locale";
+const MapView = lazy(() => import("./MapView"));
+export function Status({ status }: { status: JobStatus }) {
+  return (
+    <span className={`status status-${status}`}>
+      <span className="status-dot" />
+      <span>{t.status[status]}</span>
+    </span>
+  );
+}
 export default function FieldsApp() {
-  const api = useApi(), client = useQueryClient(), map = useRef<MapHandle>(null), input = useRef<HTMLInputElement>(null);
-  const me = useMe(), jobs = useJobs(), create = useCreateJob();
-  const [seed, setSeed] = useState<Job | null>(null), current = useJob(seed);
+  const api = useApi(),
+    client = useQueryClient(),
+    map = useRef<MapHandle>(null),
+    input = useRef<HTMLInputElement>(null);
+  const me = useMe(),
+    jobs = useJobs(),
+    create = useCreateJob();
+  const [seed, setSeed] = useState<Job | null>(null),
+    current = useJob(seed);
   const job = current.data ?? seed;
-  const [point, setPoint] = useState<Point | null>(null), [text, setText] = useState(''), [pointError, setPointError] = useState('');
-  const [date, setDate] = useState('2021-07-15'), [start, setStart] = useState('2021-03-01'), [end, setEnd] = useState('2021-09-30'), [interval, setInterval] = useState(false);
-  const [calendar, setCalendar] = useState(false), [collapsed, setCollapsed] = useState(false), [snap, setSnap] = useState('half');
-  const [bbox, setBbox] = useState<Bbox>([-180,-90,180,90]), results = useResults(bbox);
-  const [resultId, setResultId] = useState<number | null>(null), result = useResult(resultId), fields = useFields(resultId);
-  const [mapReady, setMapReady] = useState(false), [cursor, setCursor] = useState({ lat: 42, lon: -93.6, zoom: 6 }), [copied, setCopied] = useState(false);
-  const [layerOpen, setLayerOpen] = useState(false), [layers, setLayers] = useState({ fields: true, cells: true, labels: true });
-  const [modal, setModal] = useState<'search' | 'help' | null>(null), [search, setSearch] = useState('');
-  const [scenario, setScenario] = useState('default');
-  const notified = useRef<number | null>(null), displayed = useRef<number | null>(null);
+  const [point, setPoint] = useState<Point | null>(null),
+    [text, setText] = useState(""),
+    [pointError, setPointError] = useState("");
+  const [date, setDate] = useState("2021-07-15"),
+    [start, setStart] = useState("2021-03-01"),
+    [end, setEnd] = useState("2021-09-30"),
+    [interval, setInterval] = useState(false);
+  const [calendar, setCalendar] = useState(false),
+    [collapsed, setCollapsed] = useState(false),
+    [snap, setSnap] = useState("half");
+  const [bbox, setBbox] = useState<Bbox>([-180, -90, 180, 90]),
+    results = useResults(bbox);
+  const [resultId, setResultId] = useState<number | null>(null),
+    result = useResult(resultId),
+    fields = useFields(resultId);
+  const [mapReady, setMapReady] = useState(false),
+    [cursor, setCursor] = useState({ lat: 42, lon: -93.6, zoom: 6 }),
+    [copied, setCopied] = useState(false);
+  const [layerOpen, setLayerOpen] = useState(false),
+    [layers, setLayers] = useState({ fields: true, cells: true, labels: true });
+  const [modal, setModal] = useState<"search" | "help" | null>(null),
+    [search, setSearch] = useState("");
+  const [scenario, setScenario] = useState("default");
+  const notified = useRef<number | null>(null),
+    displayed = useRef<number | null>(null);
   const dateError = validateDates(interval ? start : date, interval ? end : date);
   const running = !!job && !FINISHED.includes(job.status);
-  const auth = [me.error,jobs.error,current.error,create.error,result.error,fields.error,results.error].some(e => e instanceof AuthRequiredError);
-  useEffect(() => { setScenario(new URLSearchParams(window.location.search).get('scenario') ?? 'default'); }, []);
-  useEffect(() => { const active = jobs.data?.find(j => !FINISHED.includes(j.status)); if (!seed && active) setSeed(active); }, [jobs.data,seed]);
-  useEffect(() => { if (!job || notified.current === job.id || !FINISHED.includes(job.status)) return; notified.current = job.id; if (job.status === 'done' && job.result_id !== null) { setResultId(job.result_id); toast.success(t.resultsReady); void client.invalidateQueries({ queryKey: ['results'] }); } else if (job.status === 'failed') toast.error(t.failedToast); }, [job,client]);
-  useEffect(() => { if (result.data && fields.data && mapReady && displayed.current !== result.data.id) { map.current?.showResult(result.data,fields.data); displayed.current = result.data.id; } }, [result.data,fields.data,mapReady]);
-  useEffect(() => { if (mapReady) map.current?.showCells(results.data ?? null); }, [results.data,mapReady]);
-  useEffect(() => { if (point && mapReady) map.current?.placeMarker(point); }, [point,mapReady]);
-  const newRequest = () => { setSeed(null); setPoint(null); setText(''); setPointError(''); create.reset(); setCollapsed(false); setTimeout(()=>input.current?.focus(),50); };
-  useEffect(() => { const key = (e: KeyboardEvent) => { const target = e.target; const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement; if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' || !typing && e.key === '/') { e.preventDefault(); setModal('search'); } if (e.key === 'Escape') { setModal(null); setLayerOpen(false); setCalendar(false); } if (!typing && e.key.toLowerCase() === 'n') newRequest(); if (!typing && e.key === '?') setModal('help'); }; window.addEventListener('keydown',key); return ()=>window.removeEventListener('keydown',key); });
-  const choose = (p: Point, fly = false) => { setPoint(p); setText(pointText(p)); setPointError(''); map.current?.placeMarker(p,fly); };
-  const parse = (v: string) => { if (!v.trim()) { setPoint(null); setPointError(''); return; } const p = parsePoint(v); if (p) choose(p,true); else { setPointError(t.coordinateError); setPoint(null); } };
-  const submit = () => { if (!point || dateError || running) return; create.mutate({ ...point,start: interval ? start : date,end: interval ? end : date }, { onSuccess: j => { setSeed(j); notified.current = null; } }); };
-  const selectJob = (j: Job) => { setSeed(j); choose({ lat:j.lat,lon:j.lon }); setDate(j.date); setStart(j.start_date); setEnd(j.end_date); setInterval(j.start_date !== j.end_date); if (j.result_id !== null) { displayed.current = null; setResultId(j.result_id); if (result.data?.id === j.result_id && fields.data) map.current?.showResult(result.data,fields.data); } };
-  const searchGo = () => { const p = parsePoint(search); if (p) { choose(p,true); setModal(null); return; } const cell = results.data?.find(r => r.cell.toLowerCase().includes(search.trim().toLowerCase())); if (cell) { map.current?.fitTo(cell.cell_geom); setResultId(cell.id); setModal(null); } else toast.error(t.noResults); };
-  const disabledReason = running ? t.calculating : dateError ?? (!point ? t.choosePoint : '');
-  const toggleLayer = (name: keyof typeof layers) => { const next = !layers[name]; setLayers({ ...layers,[name]:next }); map.current?.setLayer(name,next); };
+  const auth = [
+    me.error,
+    jobs.error,
+    current.error,
+    create.error,
+    result.error,
+    fields.error,
+    results.error,
+  ].some((e) => e instanceof AuthRequiredError);
+  useEffect(() => {
+    setScenario(new URLSearchParams(window.location.search).get("scenario") ?? "default");
+  }, []);
+  useEffect(() => {
+    const active = jobs.data?.find((j) => !FINISHED.includes(j.status));
+    if (!seed && active) setSeed(active);
+  }, [jobs.data, seed]);
+  useEffect(() => {
+    if (!job || notified.current === job.id || !FINISHED.includes(job.status)) return;
+    notified.current = job.id;
+    if (job.status === "done" && job.result_id !== null) {
+      setResultId(job.result_id);
+      toast.success(t.resultsReady);
+      void client.invalidateQueries({ queryKey: ["results"] });
+    } else if (job.status === "failed") toast.error(t.failedToast);
+  }, [job, client]);
+  useEffect(() => {
+    if (result.data && fields.data && mapReady && displayed.current !== result.data.id) {
+      map.current?.showResult(result.data, fields.data);
+      displayed.current = result.data.id;
+    }
+  }, [result.data, fields.data, mapReady]);
+  useEffect(() => {
+    if (mapReady) map.current?.showCells(results.data ?? null);
+  }, [results.data, mapReady]);
+  useEffect(() => {
+    if (point && mapReady) map.current?.placeMarker(point);
+  }, [point, mapReady]);
+  const newRequest = () => {
+    setSeed(null);
+    setPoint(null);
+    setText("");
+    setPointError("");
+    create.reset();
+    setCollapsed(false);
+    setTimeout(() => input.current?.focus(), 50);
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const target = e.target;
+      const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") || (!typing && e.key === "/")) {
+        e.preventDefault();
+        setModal("search");
+      }
+      if (e.key === "Escape") {
+        setModal(null);
+        setLayerOpen(false);
+        setCalendar(false);
+      }
+      if (!typing && e.key.toLowerCase() === "n") newRequest();
+      if (!typing && e.key === "?") setModal("help");
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
+  const choose = (p: Point, fly = false) => {
+    setPoint(p);
+    setText(pointText(p));
+    setPointError("");
+    map.current?.placeMarker(p, fly);
+  };
+  const parse = (v: string) => {
+    if (!v.trim()) {
+      setPoint(null);
+      setPointError("");
+      return;
+    }
+    const p = parsePoint(v);
+    if (p) choose(p, true);
+    else {
+      setPointError(t.coordinateError);
+      setPoint(null);
+    }
+  };
+  const submit = () => {
+    if (!point || dateError || running) return;
+    create.mutate(
+      { ...point, start: interval ? start : date, end: interval ? end : date },
+      {
+        onSuccess: (j) => {
+          setSeed(j);
+          notified.current = null;
+        },
+      },
+    );
+  };
+  const selectJob = (j: Job) => {
+    setSeed(j);
+    choose({ lat: j.lat, lon: j.lon });
+    setDate(j.date);
+    setStart(j.start_date);
+    setEnd(j.end_date);
+    setInterval(j.start_date !== j.end_date);
+    if (j.result_id !== null) {
+      displayed.current = null;
+      setResultId(j.result_id);
+      if (result.data?.id === j.result_id && fields.data)
+        map.current?.showResult(result.data, fields.data);
+    }
+  };
+  const searchGo = () => {
+    const p = parsePoint(search);
+    if (p) {
+      choose(p, true);
+      setModal(null);
+      return;
+    }
+    const cell = results.data?.find((r) =>
+      r.cell.toLowerCase().includes(search.trim().toLowerCase()),
+    );
+    if (cell) {
+      map.current?.fitTo(cell.cell_geom);
+      setResultId(cell.id);
+      setModal(null);
+    } else toast.error(t.noResults);
+  };
+  const disabledReason = running ? t.calculating : (dateError ?? (!point ? t.choosePoint : ""));
+  const toggleLayer = (name: keyof typeof layers) => {
+    const next = !layers[name];
+    setLayers({ ...layers, [name]: next });
+    map.current?.setLayer(name, next);
+  };
   const err = create.error;
-  return <main className={`app-shell ${collapsed ? 'panel-collapsed' : ''}`}>
-    <ClientOnly fallback={<div className="map-host" />}><Suspense fallback={<div className="map-host" />}><MapView ref={map} onPoint={p=>choose(p)} onCursor={(p,z)=>setCursor({ ...p,zoom:z })} onBounds={setBbox} onResult={id=>{ displayed.current=null; setResultId(id); }} onReady={()=>setMapReady(true)} /></Suspense></ClientOnly>
-    {!collapsed ? <aside className={`side-panel glass snap-${snap}`}>
-      <Button variant="ghost" className="mobile-handle" aria-label={t.expand} onClick={()=>setSnap(s=>s==='half'?'full':s==='full'?'peek':'half')}><span /></Button>
-      <header className="panel-header"><div className="brand"><div className="brand-symbol"><ScanLine strokeWidth={1.5} /></div><div><h1>{t.title}</h1><div className="brand-subtitle">{t.subtitle}</div></div><Button variant="ghost" size="icon" className="panel-collapse" title={t.collapse} aria-label={t.collapse} onClick={()=>setCollapsed(true)}><PanelLeftClose /></Button></div></header>
-      <div className="panel-content">
-        {auth ? <div className="auth-notice"><ShieldAlert /><h2>{t.auth}</h2><Button asChild variant="outline" className="mt-4"><a href="/login">{t.login}<ArrowUpRight /></a></Button></div> : <>
-        <p className="explanation">{t.explanation}</p><div className="model-note"><Info /><span>{t.warning}</span></div>
-        <section><h2 className="section-title"><MapPin />{t.where}<span className="section-number">01</span></h2><label htmlFor="point" className="point-label">{t.point}</label><div className="point-entry"><input id="point" ref={input} className="field-input font-mono" data-testid="point-input" value={text} placeholder={t.placeholder} onChange={e=>{setText(e.target.value); setPoint(null);}} onBlur={()=>parse(text)} onKeyDown={e=>{if(e.key==='Enter')parse(text);}} onPaste={e=>{e.preventDefault(); const v=e.clipboardData.getData('text');setText(v);parse(v);}} /><Crosshair className="input-cross" /></div>{pointError && <p className="error-text">{pointError}</p>}</section>
-        <section className="date-section"><h2 className="section-title"><CalendarDays />{t.when}<span className="section-number">02</span></h2><div className="segment"><Button variant="ghost" className={!interval?'is-active':'is-inactive'} onClick={()=>{setInterval(false);setCalendar(false);}}>{t.single}</Button><span className="flex" title={!INTERVALS_ENABLED?t.intervalDisabled:undefined}><Button variant="ghost" className={interval?'is-active w-full':'is-inactive w-full'} disabled={!INTERVALS_ENABLED} onClick={()=>{setInterval(true);const r=presetRange(date);setStart(r.start);setEnd(r.end);}}>{t.interval}</Button></span></div>
-        {!interval ? <div className="date-entry"><CalendarDays /><input className="field-input" type="date" min="2017-01-01" max={isoToday()} aria-label={t.date} data-testid="date-input" value={date} onChange={e=>setDate(e.target.value)} /></div> : <><div className="range-inputs"><div><label className="point-label" htmlFor="start">{t.start}</label><input id="start" type="date" className="field-input" data-testid="interval-start" min="2017-01-01" max={isoToday()} value={start} onChange={e=>setStart(e.target.value)} /></div><div><label className="point-label" htmlFor="end">{t.end}</label><input id="end" type="date" className="field-input" data-testid="interval-end" min="2017-01-01" max={isoToday()} value={end} onChange={e=>setEnd(e.target.value)} /></div></div><div className="presets"><Button variant="secondary" onClick={()=>{const r=presetRange(date);setStart(r.start);setEnd(r.end);}}>{t.season(Number(date.slice(0,4)))}</Button><Button variant="secondary" onClick={()=>{const r=presetRange(date,true);setStart(r.start);setEnd(r.end);}}>{t.year(Number(date.slice(0,4)))}</Button><Button variant="ghost" size="icon" aria-label={t.calendar} title={t.calendar} onClick={()=>setCalendar(!calendar)}><CalendarDays /></Button></div>{calendar && <Calendar mode="range" locale={dateLocale} selected={{from:new Date(start),to:new Date(end)}} defaultMonth={new Date(start)} disabled={{before:new Date('2017-01-01'),after:new Date()}} onSelect={r=>{if(r?.from)setStart(isoToday(r.from));if(r?.to)setEnd(isoToday(r.to));}} />}</>}
-        {dateError && <div className="error-text">{dateError}</div>}</section>
-        <div className="submit-area"><div title={disabledReason}><Button className="submit-button" data-testid="submit" disabled={!!disabledReason || create.isPending} onClick={submit}>{running||create.isPending?<Loader2 className="animate-spin"/>:<Sparkles />}{running?t.calculating:t.submit}{!running && <ArrowUpRight className="ml-auto" />}</Button></div><div className="submit-hint"><Clock3 />{t.progress}</div>{err && !(err instanceof AuthRequiredError) && <div className="error-text">{err instanceof RateLimitError || err instanceof ValidationError ? err.message : t.networkError}{!(err instanceof RateLimitError || err instanceof ValidationError) && <Button variant="link" size="sm" onClick={submit}>{t.retry}</Button>}</div>}</div>
-        {job && <section className="job-block"><div className="job-heading"><span data-testid="job-status"><Status status={job.status}/></span><span className="font-mono text-[10px] text-muted-foreground">#{job.id.toString().padStart(3,'0')}</span></div>{running && <div className="job-progress"><span /></div>}<div className="job-meta">{job.cell && <><span className="font-mono">{t.cell} {job.cell}</span><br /></>}{job.scene_date && <>{t.scene} {formatDate(job.scene_date)}<br /></>}{job.start_date!==job.end_date && <>{t.interval} {formatRange(job.start_date,job.end_date)}<br /></>}<span data-testid="job-message">{jobMessage(job.message)}</span>{current.failureCount>0 && <div className="text-warning">{t.disconnected}</div>}</div></section>}
-        {resultId!==null && <section className="result-block" data-testid="result-panel">{result.isPending||fields.isPending?<><div className="skeleton-line"/><div className="skeleton-line"/></>:result.error||fields.error?<><p className="error-text">{t.networkError}</p><Button variant="outline" onClick={()=>{void result.refetch();void fields.refetch();}}>{t.retry}</Button></>:result.data&&<><div className="result-header"><Check size={15}/>{t.resultsReady}</div><div className="job-meta font-mono">{result.data.cell}</div><div className="job-meta">{t.scene} {formatDate(result.data.scene_date)}</div><div className="result-number"><span data-testid="result-fields-count">{result.data.n_fields}</span> <small>{t.fields}</small></div><div className="job-meta">{t.model} <span className="font-mono">{result.data.model_version}</span></div><Button asChild variant="outline" className="result-download"><a data-testid="download-geojson" href={api.downloadUrl(result.data.id)} download={`${result.data.cell}.geojson`}><ArrowDownToLine />{t.download}</a></Button></>}</section>}
-        <section className="history-section"><div className="history-heading"><h2 className="section-title"><History className="!text-muted-foreground" />{t.history}</h2><span className="history-counter">{jobs.data?.length??0}</span></div>{jobs.isPending?<div className="skeleton-line"/>:jobs.error?<><p className="error-text">{t.networkError}</p><Button variant="outline" onClick={()=>void jobs.refetch()}>{t.retry}</Button></>:!jobs.data?.length?<div className="history-empty"><ScanLine /><span>{t.emptyHistory}</span></div>:jobs.data.map(j=><Button key={j.id} variant="ghost" className="history-row" data-testid="history-item" data-status={j.status} onClick={()=>selectJob(j)}><div className="history-text">{formatRange(j.start_date,j.end_date)}<span>{j.cell??`${j.lat.toFixed(4)}, ${j.lon.toFixed(4)}`}</span></div><Status status={j.status}/><ChevronRight size={12}/></Button>)}</section>
-        </>}
-      </div><footer className="panel-footer"><div className="avatar"><UserRound /></div><div><div className="account-email" data-testid="user-email">{me.data?.email??(me.isPending?t.loading:'—')}</div><div className="account-role">{t.account}</div></div><span className="connection-dot" /></footer>
-    </aside> : <nav className="rail glass"><div className="brand-symbol"><ScanLine /></div><Button variant="ghost" size="icon" aria-label={t.expand} title={t.expand} onClick={()=>setCollapsed(false)}><PanelLeftOpen /></Button><Button variant="ghost" size="icon" aria-label={t.newRequest} title={t.newRequest} onClick={newRequest}><Plus /></Button></nav>}
-    <div className="map-topbar"><div className="map-source glass"><Satellite /><div><strong>{t.satellite}</strong><small>{t.satelliteSource}</small></div></div><div className="map-top-right">{API_MODE==='mock'&&<div className="mock-pill glass">{t.demo} · {scenario}</div>}<Button variant="ghost" className="search-button glass" onClick={()=>setModal('search')} aria-label={t.search}><Search /><span>{t.search}</span><kbd>⌘ K</kbd></Button></div></div>
-    <div className="map-tools"><div className="tool-group glass"><Button variant="ghost" size="icon" title={t.zoomIn} aria-label={t.zoomIn} onClick={()=>map.current?.zoom(1)}><Plus /></Button><Button variant="ghost" size="icon" title={t.zoomOut} aria-label={t.zoomOut} onClick={()=>map.current?.zoom(-1)}><Minus /></Button></div><Button variant="ghost" size="icon" className="tool-single glass" title={t.layers} aria-label={t.layers} onClick={()=>setLayerOpen(!layerOpen)}><Layers /></Button><Button variant="ghost" size="icon" className="tool-single glass" title={t.locate} aria-label={t.locate} onClick={()=>point&&map.current?.placeMarker(point,true)}><Crosshair /></Button>{layerOpen&&<div className="layers-popover glass"><h3>{t.layers}</h3>{(['fields','cells','labels'] as const).map(name=><label className="layer-row" key={name}><span className={`swatch swatch-${name}`}/>{name==='fields'?t.fieldLayer:name==='cells'?t.cellLayer:t.labels}<input type="checkbox" checked={layers[name]} onChange={()=>toggleLayer(name)} /></label>)}</div>}</div>
-    <div className="map-bottom"><div className="map-legend glass">{layers.fields&&<div><span className="swatch swatch-fields"/>{t.fieldLayer}</div>}{layers.cells&&<div><span className="swatch swatch-cells"/>{t.cellLayer}</div>}{result.data&&<div><span className="swatch swatch-selected"/>{t.selected}</div>}</div><div className="bottom-help"><div className="scale-block">{new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(80*156.543*Math.cos(cursor.lat*Math.PI/180)/2**cursor.zoom)} {t.scale}<div className="scale-line"/></div><Button variant="ghost" size="icon" className="tool-single glass" aria-label={t.shortcuts} title={t.shortcuts} onClick={()=>setModal('help')}><Keyboard /></Button></div></div>
-    <Button variant="ghost" className="cursor-pill glass" data-testid="cursor-pill" title={t.copy} onClick={async()=>{try{await navigator.clipboard.writeText(pointText(cursor));setCopied(true);setTimeout(()=>setCopied(false),1800);}catch{toast.error(t.networkError);}}}>{copied?<Check/>:<Copy/>}{copied?t.copied:`${pointText(cursor)} · ${t.zoom} ${cursor.zoom.toFixed(1)}`}</Button>
-    {modal&&<div className="modal-overlay" onClick={()=>setModal(null)}><div className="command-modal glass" role="dialog" aria-modal="true" aria-label={modal==='search'?t.search:t.shortcuts} onClick={e=>e.stopPropagation()}><div className="command-header">{modal==='search'?<Search/>:<Keyboard/>}{modal==='search'?<input autoFocus placeholder={t.searchPlaceholder} value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')searchGo();}}/>:<h2>{t.shortcuts}</h2>}<Button variant="ghost" size="icon" aria-label={t.close} onClick={()=>setModal(null)}><X/></Button></div><div className="command-body">{modal==='search'?<>{search&&<Button variant="ghost" className="command-action" onClick={searchGo}><MapPin/>{parsePoint(search)?t.go:search}<ArrowUpRight className="ml-auto"/></Button>}<h2>{t.recent}</h2>{jobs.data?.length?jobs.data.map(j=><Button key={j.id} variant="ghost" className="command-action" onClick={()=>{selectJob(j);setModal(null);}}><History/>{j.cell??pointText(j)}<span className="ml-auto text-muted-foreground text-[10px]">{formatDate(j.date,true)}</span></Button>):<p className="text-muted-foreground text-xs">{t.empty}</p>}</>:<>{[[t.helpNew,'N'],[t.helpSearch,'⌘ K / /'],[t.helpClose,'Esc']].map(([label,key])=><div className="shortcut-row" key={key}><span>{label}</span><kbd>{key}</kbd></div>)}</>}</div></div></div>}
-  </main>;
+  return (
+    <main className={`app-shell ${collapsed ? "panel-collapsed" : ""}`}>
+      <ClientOnly fallback={<div className="map-host" />}>
+        <Suspense fallback={<div className="map-host" />}>
+          <MapView
+            ref={map}
+            onPoint={(p) => choose(p)}
+            onCursor={(p, z) => setCursor({ ...p, zoom: z })}
+            onBounds={setBbox}
+            onResult={(id) => {
+              displayed.current = null;
+              setResultId(id);
+            }}
+            onReady={() => setMapReady(true)}
+          />
+        </Suspense>
+      </ClientOnly>
+      {!collapsed ? (
+        <aside className={`side-panel glass snap-${snap}`}>
+          <Button
+            variant="ghost"
+            className="mobile-handle"
+            onPointerDown={(e) => {
+              e.currentTarget.dataset["startY"] = String(e.clientY);
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerUp={(e) => {
+              const delta = e.clientY - Number(e.currentTarget.dataset["startY"]);
+              if (Math.abs(delta) > 25) {
+                setSnap(delta < 0 ? "full" : "peek");
+                e.preventDefault();
+              }
+            }}
+            aria-label={t.expand}
+            onClick={() => setSnap((s) => (s === "half" ? "full" : s === "full" ? "peek" : "half"))}
+          >
+            <span />
+          </Button>
+          <header className="panel-header">
+            <div className="brand">
+              <div className="brand-symbol">
+                <ScanLine strokeWidth={1.5} />
+              </div>
+              <div>
+                <h1>{t.title}</h1>
+                <div className="brand-subtitle">{t.subtitle}</div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="panel-collapse"
+                title={t.collapse}
+                aria-label={t.collapse}
+                onClick={() => setCollapsed(true)}
+              >
+                <PanelLeftClose />
+              </Button>
+            </div>
+          </header>
+          <div className="panel-content">
+            {auth ? (
+              <div className="auth-notice">
+                <ShieldAlert />
+                <h2>{t.auth}</h2>
+                <Button asChild variant="outline" className="mt-4">
+                  <a href="/login">
+                    {t.login}
+                    <ArrowUpRight />
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="explanation">{t.explanation}</p>
+                <div className="model-note">
+                  <Info />
+                  <span>{t.warning}</span>
+                </div>
+                <section>
+                  <h2 className="section-title">
+                    <MapPin />
+                    {t.where}
+                    <span className="section-number">01</span>
+                  </h2>
+                  <label htmlFor="point" className="point-label">
+                    {t.point}
+                  </label>
+                  <div className="point-entry">
+                    <input
+                      id="point"
+                      ref={input}
+                      className="field-input font-mono"
+                      data-testid="point-input"
+                      value={text}
+                      placeholder={t.placeholder}
+                      onChange={(e) => {
+                        setText(e.target.value);
+                        setPoint(null);
+                      }}
+                      onBlur={() => parse(text)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") parse(text);
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const v = e.clipboardData.getData("text");
+                        setText(v);
+                        parse(v);
+                      }}
+                    />
+                    <Crosshair className="input-cross" />
+                  </div>
+                  {pointError && <p className="error-text">{pointError}</p>}
+                </section>
+                <section className="date-section">
+                  <h2 className="section-title">
+                    <CalendarDays />
+                    {t.when}
+                    <span className="section-number">02</span>
+                  </h2>
+                  <div className="segment">
+                    <Button
+                      variant="ghost"
+                      className={!interval ? "is-active" : "is-inactive"}
+                      onClick={() => {
+                        setInterval(false);
+                        setCalendar(false);
+                      }}
+                    >
+                      {t.single}
+                    </Button>
+                    <span
+                      className="flex"
+                      title={!INTERVALS_ENABLED ? t.intervalDisabled : undefined}
+                    >
+                      <Button
+                        variant="ghost"
+                        className={interval ? "is-active w-full" : "is-inactive w-full"}
+                        disabled={!INTERVALS_ENABLED}
+                        onClick={() => {
+                          setInterval(true);
+                          const r = presetRange(date);
+                          setStart(r.start);
+                          setEnd(r.end);
+                        }}
+                      >
+                        {t.interval}
+                      </Button>
+                    </span>
+                  </div>
+                  {!interval ? (
+                    <div className="date-entry">
+                      <CalendarDays />
+                      <input
+                        className="field-input"
+                        type="date"
+                        min="2017-01-01"
+                        max={isoToday()}
+                        aria-label={t.date}
+                        data-testid="date-input"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="range-inputs">
+                        <div>
+                          <label className="point-label" htmlFor="start">
+                            {t.start}
+                          </label>
+                          <input
+                            id="start"
+                            type="date"
+                            className="field-input"
+                            data-testid="interval-start"
+                            min="2017-01-01"
+                            max={isoToday()}
+                            value={start}
+                            onChange={(e) => setStart(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="point-label" htmlFor="end">
+                            {t.end}
+                          </label>
+                          <input
+                            id="end"
+                            type="date"
+                            className="field-input"
+                            data-testid="interval-end"
+                            min="2017-01-01"
+                            max={isoToday()}
+                            value={end}
+                            onChange={(e) => setEnd(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="presets">
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            const r = presetRange(date);
+                            setStart(r.start);
+                            setEnd(r.end);
+                          }}
+                        >
+                          {t.season(Number(date.slice(0, 4)))}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            const r = presetRange(date, true);
+                            setStart(r.start);
+                            setEnd(r.end);
+                          }}
+                        >
+                          {t.year(Number(date.slice(0, 4)))}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={t.calendar}
+                          title={t.calendar}
+                          onClick={() => setCalendar(!calendar)}
+                        >
+                          <CalendarDays />
+                        </Button>
+                      </div>
+                      {calendar && (
+                        <Calendar
+                          mode="range"
+                          locale={dateLocale}
+                          selected={{ from: new Date(start), to: new Date(end) }}
+                          defaultMonth={new Date(start)}
+                          disabled={{ before: new Date("2017-01-01"), after: new Date() }}
+                          onSelect={(r) => {
+                            if (r?.from) setStart(isoToday(r.from));
+                            if (r?.to) setEnd(isoToday(r.to));
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                  {dateError && <div className="error-text">{dateError}</div>}
+                </section>
+                <div className="submit-area">
+                  <div title={disabledReason}>
+                    <Button
+                      className="submit-button"
+                      data-testid="submit"
+                      disabled={!!disabledReason || create.isPending}
+                      onClick={submit}
+                    >
+                      {running || create.isPending ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Sparkles />
+                      )}
+                      {running ? t.calculating : t.submit}
+                      {!running && <ArrowUpRight className="ml-auto" />}
+                    </Button>
+                  </div>
+                  <div className="submit-hint">
+                    <Clock3 />
+                    {t.progress}
+                  </div>
+                  {err && !(err instanceof AuthRequiredError) && (
+                    <div className="error-text">
+                      {err instanceof RateLimitError || err instanceof ValidationError
+                        ? err.message
+                        : t.networkError}
+                      {!(err instanceof RateLimitError || err instanceof ValidationError) && (
+                        <Button variant="link" size="sm" onClick={submit}>
+                          {t.retry}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {job && (
+                  <section className="job-block">
+                    <div className="job-heading">
+                      <span data-testid="job-status">
+                        <Status status={job.status} />
+                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        #{job.id.toString().padStart(3, "0")}
+                      </span>
+                    </div>
+                    {running && (
+                      <div className="job-progress">
+                        <span />
+                      </div>
+                    )}
+                    <div className="job-meta">
+                      {job.cell && (
+                        <>
+                          <span className="font-mono">
+                            {t.cell} {job.cell}
+                          </span>
+                          <br />
+                        </>
+                      )}
+                      {job.scene_date && (
+                        <>
+                          {t.scene} {formatDate(job.scene_date)}
+                          <br />
+                        </>
+                      )}
+                      {job.start_date !== job.end_date && (
+                        <>
+                          {t.interval} {formatRange(job.start_date, job.end_date)}
+                          <br />
+                        </>
+                      )}
+                      <span data-testid="job-message">{jobMessage(job.message)}</span>
+                      {current.failureCount > 0 && (
+                        <div className="text-warning">{t.disconnected}</div>
+                      )}
+                    </div>
+                  </section>
+                )}
+                {resultId !== null && (
+                  <section className="result-block" data-testid="result-panel">
+                    {result.isPending || fields.isPending ? (
+                      <>
+                        <div className="skeleton-line" />
+                        <div className="skeleton-line" />
+                      </>
+                    ) : result.error || fields.error ? (
+                      <>
+                        <p className="error-text">{t.networkError}</p>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            void result.refetch();
+                            void fields.refetch();
+                          }}
+                        >
+                          {t.retry}
+                        </Button>
+                      </>
+                    ) : (
+                      result.data && (
+                        <>
+                          <div className="result-header">
+                            <Check size={15} />
+                            {t.resultsReady}
+                          </div>
+                          <div className="job-meta font-mono">{result.data.cell}</div>
+                          <div className="job-meta">
+                            {t.scene} {formatDate(result.data.scene_date)}
+                          </div>
+                          <div className="result-number">
+                            <span data-testid="result-fields-count">{result.data.n_fields}</span>{" "}
+                            <small>{t.fields}</small>
+                          </div>
+                          <div className="job-meta">
+                            {t.model} <span className="font-mono">{result.data.model_version}</span>
+                          </div>
+                          <Button asChild variant="outline" className="result-download">
+                            <a
+                              data-testid="download-geojson"
+                              href={api.downloadUrl(result.data.id)}
+                              download={`${result.data.cell}.geojson`}
+                            >
+                              <ArrowDownToLine />
+                              {t.download}
+                            </a>
+                          </Button>
+                        </>
+                      )
+                    )}
+                  </section>
+                )}
+                <section className="history-section">
+                  <div className="history-heading">
+                    <h2 className="section-title">
+                      <History className="!text-muted-foreground" />
+                      {t.history}
+                    </h2>
+                    <span className="history-counter">{jobs.data?.length ?? 0}</span>
+                  </div>
+                  {jobs.isPending ? (
+                    <div className="skeleton-line" />
+                  ) : jobs.error ? (
+                    <>
+                      <p className="error-text">{t.networkError}</p>
+                      <Button variant="outline" onClick={() => void jobs.refetch()}>
+                        {t.retry}
+                      </Button>
+                    </>
+                  ) : !jobs.data?.length ? (
+                    <div className="history-empty">
+                      <ScanLine />
+                      <span>{t.emptyHistory}</span>
+                    </div>
+                  ) : (
+                    jobs.data.map((j) => (
+                      <Button
+                        key={j.id}
+                        variant="ghost"
+                        className="history-row"
+                        data-testid="history-item"
+                        data-status={j.status}
+                        onClick={() => selectJob(j)}
+                      >
+                        <div className="history-text">
+                          {formatRange(j.start_date, j.end_date)}
+                          <span>{j.cell ?? `${j.lat.toFixed(4)}, ${j.lon.toFixed(4)}`}</span>
+                        </div>
+                        <Status status={j.status} />
+                        <ChevronRight size={12} />
+                      </Button>
+                    ))
+                  )}
+                </section>
+              </>
+            )}
+          </div>
+          <footer className="panel-footer">
+            <div className="avatar">
+              <UserRound />
+            </div>
+            <div>
+              <div className="account-email" data-testid="user-email">
+                {me.data?.email ?? (me.isPending ? t.loading : "—")}
+              </div>
+              <div className="account-role">{t.account}</div>
+            </div>
+            <span className="connection-dot" />
+          </footer>
+        </aside>
+      ) : (
+        <nav className="rail glass">
+          <div className="brand-symbol">
+            <ScanLine />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t.expand}
+            title={t.expand}
+            onClick={() => setCollapsed(false)}
+          >
+            <PanelLeftOpen />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t.newRequest}
+            title={t.newRequest}
+            onClick={newRequest}
+          >
+            <Plus />
+          </Button>
+        </nav>
+      )}
+      <div className="map-topbar">
+        <div className="map-source glass">
+          <Satellite />
+          <div>
+            <strong>{t.satellite}</strong>
+            <small>{t.satelliteSource}</small>
+          </div>
+        </div>
+        <div className="map-top-right">
+          {API_MODE === "mock" && (
+            <div className="mock-pill glass">
+              {t.demo} · {scenario}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className="search-button glass"
+            onClick={() => setModal("search")}
+            aria-label={t.search}
+          >
+            <Search />
+            <span>{t.search}</span>
+            <kbd>⌘ K</kbd>
+          </Button>
+        </div>
+      </div>
+      <div className="map-tools">
+        <div className="tool-group glass">
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t.zoomIn}
+            aria-label={t.zoomIn}
+            onClick={() => map.current?.zoom(1)}
+          >
+            <Plus />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t.zoomOut}
+            aria-label={t.zoomOut}
+            onClick={() => map.current?.zoom(-1)}
+          >
+            <Minus />
+          </Button>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="tool-single glass"
+          title={t.layers}
+          aria-label={t.layers}
+          onClick={() => setLayerOpen(!layerOpen)}
+        >
+          <Layers />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="tool-single glass"
+          title={t.locate}
+          aria-label={t.locate}
+          onClick={() => point && map.current?.placeMarker(point, true)}
+        >
+          <Crosshair />
+        </Button>
+        {layerOpen && (
+          <div className="layers-popover glass">
+            <h3>{t.layers}</h3>
+            {(["fields", "cells", "labels"] as const).map((name) => (
+              <label className="layer-row" key={name}>
+                <span className={`swatch swatch-${name}`} />
+                {name === "fields" ? t.fieldLayer : name === "cells" ? t.cellLayer : t.labels}
+                <input type="checkbox" checked={layers[name]} onChange={() => toggleLayer(name)} />
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="map-bottom">
+        <div className="map-legend glass">
+          {layers.fields && result.data && (
+            <div>
+              <span className="swatch swatch-fields" />
+              {t.fieldLayer}
+            </div>
+          )}
+          {layers.cells && cursor.zoom >= 7 && !!results.data?.length && (
+            <div>
+              <span className="swatch swatch-cells" />
+              {t.cellLayer}
+            </div>
+          )}
+          {result.data && (
+            <div>
+              <span className="swatch swatch-selected" />
+              {t.selected}
+            </div>
+          )}
+        </div>
+        <div className="bottom-help">
+          <div className="scale-block">
+            {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
+              (80 * 156.543 * Math.cos((cursor.lat * Math.PI) / 180)) / 2 ** cursor.zoom,
+            )}{" "}
+            {t.scale}
+            <div className="scale-line" />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="tool-single glass"
+            aria-label={t.shortcuts}
+            title={t.shortcuts}
+            onClick={() => setModal("help")}
+          >
+            <Keyboard />
+          </Button>
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        className="cursor-pill glass"
+        data-testid="cursor-pill"
+        title={t.copy}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(pointText(cursor));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1800);
+          } catch {
+            toast.error(t.networkError);
+          }
+        }}
+      >
+        {copied ? <Check /> : <Copy />}
+        {copied ? t.copied : `${pointText(cursor)} · ${t.zoom} ${cursor.zoom.toFixed(1)}`}
+      </Button>
+      {modal && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div
+            className="command-modal glass"
+            role="dialog"
+            aria-modal="true"
+            aria-label={modal === "search" ? t.search : t.shortcuts}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="command-header">
+              {modal === "search" ? <Search /> : <Keyboard />}
+              {modal === "search" ? (
+                <input
+                  autoFocus
+                  placeholder={t.searchPlaceholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") searchGo();
+                  }}
+                />
+              ) : (
+                <h2>{t.shortcuts}</h2>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t.close}
+                onClick={() => setModal(null)}
+              >
+                <X />
+              </Button>
+            </div>
+            <div className="command-body">
+              {modal === "search" ? (
+                <>
+                  {search && (
+                    <Button variant="ghost" className="command-action" onClick={searchGo}>
+                      <MapPin />
+                      {parsePoint(search) ? t.go : search}
+                      <ArrowUpRight className="ml-auto" />
+                    </Button>
+                  )}
+                  <h2>{t.recent}</h2>
+                  {jobs.data?.length ? (
+                    jobs.data.map((j) => (
+                      <Button
+                        key={j.id}
+                        variant="ghost"
+                        className="command-action"
+                        onClick={() => {
+                          selectJob(j);
+                          setModal(null);
+                        }}
+                      >
+                        <History />
+                        {j.cell ?? pointText(j)}
+                        <span className="ml-auto text-muted-foreground text-[10px]">
+                          {formatDate(j.date, true)}
+                        </span>
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{t.empty}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {[
+                    [t.helpNew, "N"],
+                    [t.helpSearch, "⌘ K / /"],
+                    [t.helpClose, "Esc"],
+                  ].map(([label, key]) => (
+                    <div className="shortcut-row" key={key}>
+                      <span>{label}</span>
+                      <kbd>{key}</kbd>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
 }

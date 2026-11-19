@@ -33,3 +33,6 @@ use the editor.
 - Keep TanStack routing and a browser-initialized API provider; the fixed template requires TanStack and no app backend is needed.
 - All remote service access belongs to src/services/api/http; UI consumes the API context and Query hooks to keep mock and HTTP implementations interchangeable.
 - Only MapView imports MapLibre; lazy-load it behind ClientOnly and expose an imperative handle so large GeoJSON stays outside component state.
+
+- Persist mock snapshots only in browser session storage to exercise reload recovery without adding a real backend.
+- The API guard excludes the required template server entry because its fetch method is the host handler, not an outgoing network request.
