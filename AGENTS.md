@@ -34,5 +34,7 @@ use the editor.
 - All remote service access belongs to src/services/api/http; UI consumes the API context and Query hooks to keep mock and HTTP implementations interchangeable.
 - Only MapView imports MapLibre; lazy-load it behind ClientOnly and expose an imperative handle so large GeoJSON stays outside component state.
 
-- Persist mock snapshots only in browser session storage to exercise reload recovery without adding a real backend.
+- Preserve supplied API files; implement browser reload recovery in a delegating mock adapter with session-storage request replay, so the contract stays interchangeable with HTTP.
+- Define Tailwind v4 tokens in global CSS, not a legacy Tailwind config, because the CSS-first compiler does not load it.
+- Keep request date rules and presets in lib/dates.ts and order active history jobs before finished jobs, so UI and service validation agree.
 - The API guard excludes the required template server entry because its fetch method is the host handler, not an outgoing network request.

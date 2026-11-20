@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { FieldsApi } from "./FieldsApi";
-import { API_MODE } from "@/config";
+import { API_MODE } from "./mode";
 import { ru } from "@/i18n/ru";
 const Context = createContext<FieldsApi | null>(null);
 export function ApiProvider({ children, api }: { children: ReactNode; api: FieldsApi }) {
@@ -18,7 +18,7 @@ export function ApiRuntime({ children }: { children: ReactNode }) {
     const load = async () => {
       const instance =
         API_MODE === "mock"
-          ? new (await import("./mock/MockFieldsApi")).MockFieldsApi(
+          ? await (await import("./mock/BrowserMockFieldsApi")).BrowserMockFieldsApi.create(
               Date.now,
               new URLSearchParams(window.location.search).get("scenario") ?? "default",
               300,

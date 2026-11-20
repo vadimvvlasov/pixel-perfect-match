@@ -1,4 +1,5 @@
 import { ru } from "@/i18n/ru";
+import { datesError, usSeason, wholeYear } from "./dates";
 export interface Point {
   lon: number;
   lat: number;
@@ -29,17 +30,10 @@ export function validateDates(start: string, end: string, today = isoToday()): s
     !Number.isNaN(Date.parse(s)) &&
     new Date(s).toISOString().slice(0, 10) === s;
   if (!valid(start) || !valid(end)) return ru.dateInvalid;
-  if (start > end) return ru.dateOrder;
-  if ((Date.parse(end) - Date.parse(start)) / 86400000 + 1 > 366) return ru.dateLength;
-  return null;
+  return datesError({ mode: "interval", start, end }, today);
 }
 export function presetRange(date: string, full = false, today = isoToday()) {
-  const year = date.slice(0, 4);
-  return {
-    start:
-      `${year}-${full ? "01-01" : "03-01"}` > today ? today : `${year}-${full ? "01-01" : "03-01"}`,
-    end:
-      `${year}-${full ? "12-31" : "09-30"}` > today ? today : `${year}-${full ? "12-31" : "09-30"}`,
-  };
+  const year = Number(date.slice(0, 4));
+  return full ? wholeYear(year, today) : usSeason(year, today);
 }
 export const pointText = (p: Point) => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;

@@ -1,70 +1,40 @@
-import type * as GeoJSON from "geojson";
+import { ApiError, AuthRequiredError, errorFor, NetworkError } from "../errors";
 import type { FieldsApi } from "../FieldsApi";
-import type { Job, JobRequest, ResultMeta, Me, Bbox } from "../types";
-import {
-  ApiError,
-  AuthRequiredError,
-  ValidationError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-  NetworkError,
-} from "../errors";
+import type { Bbox, Job, JobRequest, Me, ResultMeta } from "../types";
+
+/** The Worker's API on the same origin (the session cookie goes along). The only place that calls `fetch`. */
 export class HttpFieldsApi implements FieldsApi {
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    let response: Response;
+  constructor(
+    private readonly base = "",
+    private readonly fetchImpl: typeof fetch = (...a) => fetch(...a),
+  ) {}
+
+  private async call<T>(path: string, init?: RequestInit): Promise<T> {
+    let res: Response;
     try {
-      response = await fetch(`/api/${path}`, { credentials: "same-origin", ...init });
+      res = await this.fetchImpl(this.base + path, { ...init, headers: { "content-type": "application/json" }, credentials: "same-origin" });
     } catch {
       throw new NetworkError();
     }
-    if (response.headers.get("content-type")?.includes("text/html")) throw new AuthRequiredError();
-    let body;
+    const json = (res.headers.get("content-type") ?? "").includes("json");
+    if (!json && res.ok) throw new AuthRequiredError("нет доступа: войдите заново", res.status); // a login page
+    if (!res.ok) {
+      const body = json ? await res.json().catch(() => ({})) : {};
+      throw errorFor(res.status, typeof body.error === "string" ? body.error : `${res.status} ${res.statusText}`.trim());
+    }
     try {
-      body = await response.json();
+      return (await res.json()) as T;
     } catch {
-      throw new NetworkError();
+      throw new ApiError("сервер ответил не JSON", res.status);
     }
-    if (!response.ok) {
-      const m = body.error ?? response.statusText;
-      const classes: Record<number, new (s: string) => ApiError> = {
-        400: ValidationError,
-        403: AuthRequiredError,
-        404: NotFoundError,
-        409: ConflictError,
-        429: RateLimitError,
-      };
-      const C = classes[response.status];
-      throw C ? new C(m) : new ApiError(m, response.status);
-    }
-    return body as T;
   }
-  me() {
-    return this.request<Me>("me");
-  }
-  createJob(r: JobRequest) {
-    return this.request<Job>("jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(r),
-    });
-  }
-  listJobs() {
-    return this.request<Job[]>("jobs");
-  }
-  getJob(id: number) {
-    return this.request<Job>(`jobs/${id}`);
-  }
-  listResults(bbox: Bbox) {
-    return this.request<ResultMeta[]>(`results?bbox=${bbox.join(",")}`);
-  }
-  getResult(id: number) {
-    return this.request<ResultMeta>(`results/${id}`);
-  }
-  getFields(id: number) {
-    return this.request<GeoJSON.FeatureCollection>(`results/${id}/fields.geojson`);
-  }
-  downloadUrl(id: number) {
-    return `/api/results/${id}/fields.geojson?download=1`;
-  }
+
+  me = () => this.call<Me>("/api/me");
+  createJob = (r: JobRequest) => this.call<Job>("/api/jobs", { method: "POST", body: JSON.stringify(r) });
+  listJobs = () => this.call<Job[]>("/api/jobs");
+  getJob = (id: number) => this.call<Job>(`/api/jobs/${id}`);
+  listResults = (b: Bbox) => this.call<ResultMeta[]>(`/api/results?bbox=${b.join(",")}`);
+  getResult = (id: number) => this.call<ResultMeta>(`/api/results/${id}`);
+  getFields = (id: number) => this.call<GeoJSON.FeatureCollection>(`/api/results/${id}/fields.geojson`);
+  downloadUrl = (id: number) => `${this.base}/api/results/${id}/fields.geojson?download=1`;
 }

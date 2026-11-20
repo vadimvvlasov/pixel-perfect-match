@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./context";
 import { FINISHED, type Job, type JobRequest, type Bbox } from "./types";
 import { AuthRequiredError } from "./errors";
+import { orderJobs } from "@/lib/job-order";
 const base = {
   refetchOnWindowFocus: false,
   retry: (n: number, e: Error) => !(e instanceof AuthRequiredError) && n < 2,
@@ -28,7 +29,7 @@ export function useJob(seed: Job | null) {
       if (!seed) throw new Error("Missing job");
       const j = await api.getJob(seed.id);
       client.setQueryData<Job[]>(["jobs"], (old) =>
-        [j, ...(old ?? []).filter((x) => x.id !== j.id)].sort((a, b) => b.id - a.id).slice(0, 20),
+        orderJobs([j, ...(old ?? []).filter((x) => x.id !== j.id)]),
       );
       return j;
     },

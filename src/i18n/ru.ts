@@ -22,6 +22,8 @@ export const ru = {
   dateOrder: "Начало интервала позже конца",
   dateLength: "Интервал — не больше года",
   dateInvalid: "Даты — с 2017-01-01 по сегодня",
+  dateRequired: "Укажите даты",
+  rateLimit: "Слишком много запросов: дождитесь завершения текущих и повторите",
   submit: "Найти поля",
   calculating: "Идёт расчёт…",
   choosePoint: "Сначала выберите точку на карте",
@@ -100,6 +102,13 @@ export const ru = {
   design: "Оформление · Поля по клику",
   tokens: "Цвета",
   controls: "Элементы",
+  typography: "Типографика",
+  badges: "Статусы",
+  cards: "Результаты",
+  notifications: "Уведомления",
+  skeletons: "Загрузка",
+  sen2sr: "sen2sr-da",
+  tci: "tci-da",
   networkError: "Не удалось загрузить данные",
 };
 export const formatDate = (d: string, short = false) =>

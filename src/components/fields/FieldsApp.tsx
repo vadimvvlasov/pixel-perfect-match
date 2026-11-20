@@ -29,7 +29,10 @@ import {
   Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { RequestDatePicker } from "./RequestDatePicker";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { orderJobs } from "@/lib/job-order";
 import { ru as t, formatDate, formatRange, jobMessage } from "@/i18n/ru";
 import {
   parsePoint,
@@ -39,7 +42,8 @@ import {
   isoToday,
   type Point,
 } from "@/lib/field-utils";
-import { API_MODE, INTERVALS_ENABLED } from "@/config";
+import { INTERVALS_ENABLED } from "@/config";
+import { API_MODE } from "@/services/api/mode";
 import { useApi } from "@/services/api/context";
 import {
   useMe,
@@ -54,14 +58,13 @@ import { AuthRequiredError, RateLimitError, ValidationError } from "@/services/a
 import { FINISHED, type Job, type JobStatus, type Bbox } from "@/services/api/types";
 import type { MapHandle } from "./map-types";
 import { toast } from "sonner";
-import { ru as dateLocale } from "date-fns/locale";
 const MapView = lazy(() => import("./MapView"));
 export function Status({ status }: { status: JobStatus }) {
   return (
-    <span className={`status status-${status}`}>
+    <Badge variant="outline" className={`status status-${status}`}>
       <span className="status-dot" />
       <span>{t.status[status]}</span>
-    </span>
+    </Badge>
   );
 }
 export default function FieldsApp() {
@@ -82,7 +85,6 @@ export default function FieldsApp() {
     [start, setStart] = useState("2021-03-01"),
     [end, setEnd] = useState("2021-09-30"),
     [interval, setInterval] = useState(false);
-  const [calendar, setCalendar] = useState(false),
     [collapsed, setCollapsed] = useState(false),
     [snap, setSnap] = useState("half");
   const [bbox, setBbox] = useState<Bbox>([-180, -90, 180, 90]),
@@ -159,7 +161,6 @@ export default function FieldsApp() {
       if (e.key === "Escape") {
         setModal(null);
         setLayerOpen(false);
-        setCalendar(false);
       }
       if (!typing && e.key.toLowerCase() === "n") newRequest();
       if (!typing && e.key === "?") setModal("help");
@@ -228,7 +229,7 @@ export default function FieldsApp() {
       setModal(null);
     } else toast.error(t.noResults);
   };
-  const disabledReason = running ? t.calculating : (dateError ?? (!point ? t.choosePoint : ""));
+  const disabledReason = create.isPending ? t.loading : running ? t.calculating : (dateError ?? (!point ? t.choosePoint : ""));
   const toggleLayer = (name: keyof typeof layers) => {
     const next = !layers[name];
     setLayers({ ...layers, [name]: next });
@@ -236,7 +237,8 @@ export default function FieldsApp() {
   };
   const err = create.error;
   return (
-    <main className={`app-shell ${collapsed ? "panel-collapsed" : ""}`}>
+    <TooltipProvider delayDuration={200}>
+    <main className={`app-shell snap-${snap} ${collapsed ? "panel-collapsed" : ""}`}>
       <ClientOnly fallback={<div className="map-host" />}>
         <Suspense fallback={<div className="map-host" />}>
           <MapView
@@ -361,15 +363,11 @@ export default function FieldsApp() {
                       className={!interval ? "is-active" : "is-inactive"}
                       onClick={() => {
                         setInterval(false);
-                        setCalendar(false);
                       }}
                     >
                       {t.single}
                     </Button>
-                    <span
-                      className="flex"
-                      title={!INTERVALS_ENABLED ? t.intervalDisabled : undefined}
-                    >
+                    <Tooltip><TooltipTrigger asChild><span className="flex" tabIndex={!INTERVALS_ENABLED ? 0 : -1}>
                       <Button
                         variant="ghost"
                         className={interval ? "is-active w-full" : "is-inactive w-full"}
@@ -383,13 +381,13 @@ export default function FieldsApp() {
                       >
                         {t.interval}
                       </Button>
-                    </span>
+                    </span></TooltipTrigger>{!INTERVALS_ENABLED && <TooltipContent>{t.intervalDisabled}</TooltipContent>}</Tooltip>
                   </div>
                   {!interval ? (
                     <div className="date-entry">
-                      <CalendarDays />
+                      <RequestDatePicker start={date} onStart={setDate} />
                       <input
-                        className="field-input"
+                        className="sr-only"
                         type="date"
                         min="2017-01-01"
                         max={isoToday()}
@@ -454,35 +452,14 @@ export default function FieldsApp() {
                         >
                           {t.year(Number(date.slice(0, 4)))}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={t.calendar}
-                          title={t.calendar}
-                          onClick={() => setCalendar(!calendar)}
-                        >
-                          <CalendarDays />
-                        </Button>
                       </div>
-                      {calendar && (
-                        <Calendar
-                          mode="range"
-                          locale={dateLocale}
-                          selected={{ from: new Date(start), to: new Date(end) }}
-                          defaultMonth={new Date(start)}
-                          disabled={{ before: new Date("2017-01-01"), after: new Date() }}
-                          onSelect={(r) => {
-                            if (r?.from) setStart(isoToday(r.from));
-                            if (r?.to) setEnd(isoToday(r.to));
-                          }}
-                        />
-                      )}
+                      <RequestDatePicker range start={start} end={end} onStart={setStart} onEnd={setEnd} />
                     </>
                   )}
                   {dateError && <div className="error-text">{dateError}</div>}
                 </section>
                 <div className="submit-area">
-                  <div title={disabledReason}>
+                  <Tooltip><TooltipTrigger asChild><div tabIndex={disabledReason ? 0 : -1}>
                     <Button
                       className="submit-button"
                       data-testid="submit"
@@ -494,18 +471,18 @@ export default function FieldsApp() {
                       ) : (
                         <Sparkles />
                       )}
-                      {running ? t.calculating : t.submit}
+                      {t.submit}
                       {!running && <ArrowUpRight className="ml-auto" />}
                     </Button>
-                  </div>
+                  </div></TooltipTrigger>{disabledReason && <TooltipContent>{disabledReason}</TooltipContent>}</Tooltip>
                   <div className="submit-hint">
                     <Clock3 />
                     {t.progress}
                   </div>
                   {err && !(err instanceof AuthRequiredError) && (
                     <div className="error-text">
-                      {err instanceof RateLimitError || err instanceof ValidationError
-                        ? err.message
+                      {err instanceof RateLimitError ? t.rateLimit : err instanceof ValidationError
+                        ? dateError ?? t.dateInvalid
                         : t.networkError}
                       {!(err instanceof RateLimitError || err instanceof ValidationError) && (
                         <Button variant="link" size="sm" onClick={submit}>
@@ -634,7 +611,7 @@ export default function FieldsApp() {
                       <span>{t.emptyHistory}</span>
                     </div>
                   ) : (
-                    jobs.data.map((j) => (
+                    orderJobs(jobs.data).map((j) => (
                       <Button
                         key={j.id}
                         variant="ghost"
@@ -918,5 +895,6 @@ export default function FieldsApp() {
         </div>
       )}
     </main>
+    </TooltipProvider>
   );
 }
