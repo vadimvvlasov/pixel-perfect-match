@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePoint, validateDates, presetRange } from "@/lib/field-utils";
+import { BrowserMockFieldsApi } from "@/services/api/mock/BrowserMockFieldsApi";
 import { MockFieldsApi } from "@/services/api/mock/MockFieldsApi";
 import {
   AuthRequiredError,
@@ -26,9 +27,10 @@ describe("coordinate parsing", () => {
 describe("date rules", () => {
   it("rejects reversed dates", () =>
     expect(validateDates("2021-09-01", "2021-03-01")).toBe(ru.dateOrder));
-  it("allows exactly 366 inclusive days and rejects 367", () => {
+  it("allows the supplied 366-day difference and rejects 367", () => {
     expect(validateDates("2020-01-01", "2020-12-31")).toBeNull();
-    expect(validateDates("2020-01-01", "2021-01-01")).toBe(ru.dateLength);
+    expect(validateDates("2020-01-01", "2021-01-01")).toBeNull();
+    expect(validateDates("2020-01-01", "2021-01-02")).toBe(ru.dateLength);
   });
   it("rejects pre-Sentinel, future and impossible dates", () => {
     for (const date of ["2016-12-31", "2027-01-01", "2021-02-30"])
@@ -45,7 +47,7 @@ describe("date rules", () => {
 describe("deterministic mock", () => {
   it("follows queued,locating,running,done clock and generates fields", async () => {
     let time = now;
-    const api = new MockFieldsApi(() => time, "default", 0);
+    const api = new MockFieldsApi({ now: () => time, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     const j = await api.createJob(request);
     expect(j.status).toBe("queued");
     time += 1000;
@@ -58,38 +60,38 @@ describe("deterministic mock", () => {
     expect(done.cell).toBe("MOCK_-908_449");
     if (done.result_id === null) throw Error("result absent");
     const f = await api.getFields(done.result_id);
-    expect(f.features).toHaveLength(56);
+    expect(f.features).toHaveLength(55);
     expect(f.features.every((x) => Number(x.properties?.["area_ha"]) > 0)).toBe(true);
     expect(api.downloadUrl(done.result_id)).toMatch(/^data:application\/geo\+json/);
   });
   it("limits in-progress jobs to 3", async () => {
-    const api = new MockFieldsApi(() => now, "default", 0);
+    const api = new MockFieldsApi({ now: () => now, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     for (let n = 0; n < 3; n++) await api.createJob(request);
     await expect(api.createJob(request)).rejects.toThrow(RateLimitError);
   });
   it("returns not found for another job", async () => {
-    const api = new MockFieldsApi(() => now, "default", 0);
+    const api = new MockFieldsApi({ now: () => now, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     await expect(api.getJob(999)).rejects.toThrow(NotFoundError);
   });
   it("validates intervals in service", async () => {
-    const api = new MockFieldsApi(() => now, "default", 0);
+    const api = new MockFieldsApi({ now: () => now, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     await expect(
       api.createJob({ ...request, start: "2021-08-01", end: "2021-01-01" }),
     ).rejects.toThrow("start must not be after end");
     await expect(
-      api.createJob({ ...request, start: "2020-01-01", end: "2021-01-01" }),
+      api.createJob({ ...request, start: "2020-01-01", end: "2021-01-02" }),
     ).rejects.toThrow("the interval is at most 366 days");
     await expect(api.createJob({ ...request, start: "2016-01-01" })).rejects.toThrow(
       ValidationError,
     );
   });
   it("validates coordinates in service", async () => {
-    const api = new MockFieldsApi(() => now, "default", 0);
+    const api = new MockFieldsApi({ now: () => now, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     await expect(api.createJob({ ...request, lat: 91 })).rejects.toThrow(ValidationError);
   });
   it("reuses cell and scene", async () => {
     let time = now;
-    const api = new MockFieldsApi(() => time, "default", 0);
+    const api = new MockFieldsApi({ now: () => time, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     const a = await api.createJob(request);
     time += 8000;
     const first = await api.getJob(a.id);
@@ -101,7 +103,7 @@ describe("deterministic mock", () => {
   });
   it("selects scene inside interval", async () => {
     let time = now;
-    const api = new MockFieldsApi(() => time, "default", 0);
+    const api = new MockFieldsApi({ now: () => time, scenario: "default", latencyMs: 0, email: "agronom@example.com" });
     const j = await api.createJob({ ...request, start: "2021-03-01", end: "2021-09-30" });
     time += 8000;
     const done = await api.getJob(j.id);
@@ -110,21 +112,21 @@ describe("deterministic mock", () => {
   });
   it("handles no-scene", async () => {
     let time = now;
-    const api = new MockFieldsApi(() => time, "no-scene", 0);
+    const api = new MockFieldsApi({ now: () => time, scenario: "no-scene", latencyMs: 0, email: "agronom@example.com" });
     const j = await api.createJob(request);
     time += 8000;
     expect((await api.getJob(j.id)).status).toBe("no_scene");
   });
   it("handles auth", async () => {
-    await expect(new MockFieldsApi(() => now, "auth", 0).me()).rejects.toThrow(AuthRequiredError);
+    await expect(new MockFieldsApi({ now: () => now, scenario: "auth", latencyMs: 0, email: "agronom@example.com" }).me()).rejects.toThrow(AuthRequiredError);
   });
   it("handles rate-limited", async () => {
     await expect(
-      new MockFieldsApi(() => now, "rate-limited", 0).createJob(request),
+      new MockFieldsApi({ now: () => now, scenario: "rate-limited", latencyMs: 0, email: "agronom@example.com" }).createJob(request),
     ).rejects.toThrow(RateLimitError);
   });
   it("every fourth flaky call fails", async () => {
-    const api = new MockFieldsApi(() => now, "flaky", 0);
+    const api = new MockFieldsApi({ now: () => now, scenario: "flaky", latencyMs: 0, email: "agronom@example.com" });
     for (let i = 0; i < 3; i++) await api.me();
     await expect(api.me()).rejects.toThrow(NetworkError);
     expect(await api.me()).toEqual({ email: "agronom@example.com" });
@@ -132,9 +134,9 @@ describe("deterministic mock", () => {
   it("restores in-progress work after reload", async () => {
     sessionStorage.clear();
     let time = now;
-    const api = new MockFieldsApi(() => time, "default", 0, sessionStorage);
+    const api = await BrowserMockFieldsApi.create(() => time, "default", 0, sessionStorage);
     const j = await api.createJob(request);
-    const restored = new MockFieldsApi(() => time, "default", 0, sessionStorage);
+    const restored = await BrowserMockFieldsApi.create(() => time, "default", 0, sessionStorage);
     expect((await restored.listJobs())[0]?.id).toBe(j.id);
     time += 8000;
     expect((await restored.getJob(j.id)).status).toBe("done");

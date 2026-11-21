@@ -31,6 +31,8 @@
   --color-cells: var(--cells);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-sen2sr: var(--sen2sr);
+  --color-tci: var(--tci);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 10px;
@@ -41,7 +43,7 @@
   --foreground: oklch(0.97 0.002 286);
   --card: oklch(0.17 0.005 286);
   --popover: oklch(0.19 0.005 286);
-  --primary: oklch(0.718 0.202 349.761);
+  --primary: oklch(0.823 0.12 346.018);
   --primary-foreground: oklch(0.19 0.02 345);
   --secondary: oklch(0.26 0.005 286);
   --muted: oklch(0.24 0.005 286);
@@ -56,6 +58,8 @@
   --cells: oklch(0.753 0.139 232.661);
   --success: oklch(0.765 0.177 163.223);
   --warning: oklch(0.828 0.189 84.429);
+  --sen2sr: oklch(0.702 0.183 293.541);
+  --tci: oklch(0.765 0.177 163.223);
   --map-fields: #facc15;
   --map-cells: #38bdf8;
   --map-selected: #f472b6;
@@ -373,6 +377,10 @@ h1 {
   gap: 6px;
   font-size: 11px;
   color: var(--muted-foreground);
+  border: 0;
+  padding: 2px 0;
+  font-weight: 400;
+  white-space: normal;
 }
 .status-dot {
   width: 6px;
@@ -530,6 +538,7 @@ h1 {
   font-size: 11px;
   color: var(--muted-foreground);
 }
+.account-email { overflow-wrap: anywhere; }
 .account-role {
   font-size: 9px;
   color: var(--subtle);
@@ -714,6 +723,7 @@ kbd {
   font-size: 10px;
   color: var(--muted-foreground);
 }
+.map-legend:empty { display: none; }
 .map-legend > div {
   display: flex;
   gap: 7px;
@@ -1044,6 +1054,12 @@ kbd {
     font-size: 9px;
     padding: 0 8px;
   }
+  .app-shell.snap-peek .map-bottom,
+  .app-shell.snap-peek .cursor-pill { bottom: 116px; }
+  .app-shell.snap-full .map-bottom,
+  .app-shell.snap-full .cursor-pill { display: none; }
+  .presets > *, .cursor-pill, .segment > *, .mobile-handle { min-height: 44px; }
+  .side-panel.snap-peek { height: 118px; }
   .webgl-notice {
     left: 50%;
     top: 25%;

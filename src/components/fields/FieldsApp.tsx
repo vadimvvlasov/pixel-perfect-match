@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RequestDatePicker } from "./RequestDatePicker";
+import { MapPalette } from "./MapPalette";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { orderJobs } from "@/lib/job-order";
@@ -85,7 +87,7 @@ export default function FieldsApp() {
     [start, setStart] = useState("2021-03-01"),
     [end, setEnd] = useState("2021-09-30"),
     [interval, setInterval] = useState(false);
-    [collapsed, setCollapsed] = useState(false),
+  const [collapsed, setCollapsed] = useState(false),
     [snap, setSnap] = useState("half");
   const [bbox, setBbox] = useState<Bbox>([-180, -90, 180, 90]),
     results = useResults(bbox);
@@ -357,19 +359,23 @@ export default function FieldsApp() {
                     {t.when}
                     <span className="section-number">02</span>
                   </h2>
-                  <div className="segment">
-                    <Button
-                      variant="ghost"
+                  <ToggleGroup className="segment" type="single" value={interval ? "interval" : "one"} onValueChange={(value) => {
+                    if (!value) return;
+                    setInterval(value === "interval");
+                    if (value === "interval") { const r = presetRange(date); setStart(r.start); setEnd(r.end); }
+                  }}>
+                    <ToggleGroupItem
+                      value="one"
                       className={!interval ? "is-active" : "is-inactive"}
                       onClick={() => {
                         setInterval(false);
                       }}
                     >
                       {t.single}
-                    </Button>
+                    </ToggleGroupItem>
                     <Tooltip><TooltipTrigger asChild><span className="flex" tabIndex={!INTERVALS_ENABLED ? 0 : -1}>
-                      <Button
-                        variant="ghost"
+                      <ToggleGroupItem
+                        value="interval"
                         className={interval ? "is-active w-full" : "is-inactive w-full"}
                         disabled={!INTERVALS_ENABLED}
                         onClick={() => {
@@ -380,9 +386,9 @@ export default function FieldsApp() {
                         }}
                       >
                         {t.interval}
-                      </Button>
+                      </ToggleGroupItem>
                     </span></TooltipTrigger>{!INTERVALS_ENABLED && <TooltipContent>{t.intervalDisabled}</TooltipContent>}</Tooltip>
-                  </div>
+                  </ToggleGroup>
                   {!interval ? (
                     <div className="date-entry">
                       <RequestDatePicker start={date} onStart={setDate} />
@@ -399,7 +405,7 @@ export default function FieldsApp() {
                     </div>
                   ) : (
                     <>
-                      <div className="range-inputs">
+                      <div className="range-inputs sr-only">
                         <div>
                           <label className="point-label" htmlFor="start">
                             {t.start}
@@ -810,86 +816,18 @@ export default function FieldsApp() {
         {copied ? <Check /> : <Copy />}
         {copied ? t.copied : `${pointText(cursor)} · ${t.zoom} ${cursor.zoom.toFixed(1)}`}
       </Button>
-      {modal && (
+      <MapPalette open={modal === "search"} onClose={() => setModal(null)} search={search} onSearch={setSearch} onGo={searchGo} jobs={jobs.data ?? []} onJob={selectJob} />
+      {modal === "help" && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div
-            className="command-modal glass"
-            role="dialog"
-            aria-modal="true"
-            aria-label={modal === "search" ? t.search : t.shortcuts}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="command-modal glass" role="dialog" aria-modal="true" aria-label={t.shortcuts} onClick={(e) => e.stopPropagation()}>
             <div className="command-header">
-              {modal === "search" ? <Search /> : <Keyboard />}
-              {modal === "search" ? (
-                <input
-                  autoFocus
-                  placeholder={t.searchPlaceholder}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") searchGo();
-                  }}
-                />
-              ) : (
-                <h2>{t.shortcuts}</h2>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t.close}
-                onClick={() => setModal(null)}
-              >
-                <X />
-              </Button>
+              <Keyboard /><h2>{t.shortcuts}</h2>
+              <Button variant="ghost" size="icon" aria-label={t.close} onClick={() => setModal(null)}><X /></Button>
             </div>
             <div className="command-body">
-              {modal === "search" ? (
-                <>
-                  {search && (
-                    <Button variant="ghost" className="command-action" onClick={searchGo}>
-                      <MapPin />
-                      {parsePoint(search) ? t.go : search}
-                      <ArrowUpRight className="ml-auto" />
-                    </Button>
-                  )}
-                  <h2>{t.recent}</h2>
-                  {jobs.data?.length ? (
-                    jobs.data.map((j) => (
-                      <Button
-                        key={j.id}
-                        variant="ghost"
-                        className="command-action"
-                        onClick={() => {
-                          selectJob(j);
-                          setModal(null);
-                        }}
-                      >
-                        <History />
-                        {j.cell ?? pointText(j)}
-                        <span className="ml-auto text-muted-foreground text-[10px]">
-                          {formatDate(j.date, true)}
-                        </span>
-                      </Button>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground text-xs">{t.empty}</p>
-                  )}
-                </>
-              ) : (
-                <>
-                  {[
-                    [t.helpNew, "N"],
-                    [t.helpSearch, "⌘ K / /"],
-                    [t.helpClose, "Esc"],
-                  ].map(([label, key]) => (
-                    <div className="shortcut-row" key={key}>
-                      <span>{label}</span>
-                      <kbd>{key}</kbd>
-                    </div>
-                  ))}
-                </>
-              )}
+              {[[t.helpNew, "N"], [t.helpSearch, "⌘ K / /"], [t.helpClose, "Esc"]].map(([label, key]) => (
+                <div className="shortcut-row" key={key}><span>{label}</span><kbd>{key}</kbd></div>
+              ))}
             </div>
           </div>
         </div>

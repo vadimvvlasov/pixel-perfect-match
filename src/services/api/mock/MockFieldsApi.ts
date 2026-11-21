@@ -115,7 +115,11 @@ export class MockFieldsApi implements FieldsApi {
     const [minx, miny, maxx, maxy] = bbox;
     return this.results
       .filter((r) => {
-        const [[x0, y0], , [x1, y1]] = r.cell_geom.coordinates[0];
+        const ring = r.cell_geom.coordinates[0];
+        const start = ring?.[0], end = ring?.[2];
+        if (!start || !end) return false;
+        const [x0, y0] = start, [x1, y1] = end;
+        if (x0 === undefined || y0 === undefined || x1 === undefined || y1 === undefined) return false;
         return x0 <= maxx && x1 >= minx && y0 <= maxy && y1 >= miny;
       })
       .map(meta);
@@ -239,16 +243,21 @@ function random(seed: number): () => number {
 function areaHa(ring: [number, number][]): number {
   const lat0 = (ring.reduce((s, p) => s + p[1], 0) / ring.length) * (Math.PI / 180);
   const m = 111_320;
-  const pts = ring.map(([x, y]) => [x * m * Math.cos(lat0), y * m]);
+  const pts = ring.map(([x, y]): [number, number] => [x * m * Math.cos(lat0), y * m]);
   let s = 0;
-  for (let i = 0; i < pts.length - 1; i++) s += pts[i][0] * pts[i + 1][1] - pts[i + 1][0] * pts[i][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (a && b) s += a[0] * b[1] - b[0] * a[1];
+  }
   return Math.round((Math.abs(s) / 2 / 10_000) * 100) / 100;
 }
 
 /** A GRID x GRID layout of rectangles with road gaps; some left empty (not a field). */
 export function fields(cell: string, ring: [number, number][]): GeoJSON.Feature[] {
   const rnd = random(hash(cell));
-  const [[x0, y0], , [x1, y1]] = ring;
+  const start = ring[0], end = ring[2];
+  if (!start || !end) return [];
+  const [x0, y0] = start, [x1, y1] = end;
   const sx = (x1 - x0) / GRID;
   const sy = (y1 - y0) / GRID;
   const r = (v: number) => Math.round(v * 1e6) / 1e6;

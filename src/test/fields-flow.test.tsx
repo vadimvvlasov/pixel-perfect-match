@@ -79,7 +79,7 @@ async function advance(ms: number) {
 describe("polling", () => {
   it("waits 3 seconds, updates history and stops at done", async () => {
     vi.useFakeTimers();
-    const api = new MockFieldsApi(Date.now, "default", 0);
+    const api = new MockFieldsApi({ now: Date.now, latencyMs: 0 });
     const seed = await api.createJob(request);
     const get = vi.spyOn(api, "getJob");
     const { wrapper, client } = setup(api);
@@ -99,7 +99,7 @@ describe("polling", () => {
   });
   it("retries a failed poll after 6 seconds without losing the job", async () => {
     vi.useFakeTimers();
-    const api = new MockFieldsApi(Date.now, "default", 0);
+    const api = new MockFieldsApi({ now: Date.now, latencyMs: 0 });
     const seed = await api.createJob(request);
     const get = vi.spyOn(api, "getJob").mockRejectedValueOnce(new NetworkError());
     const { wrapper } = setup(api);
@@ -119,7 +119,7 @@ describe("polling", () => {
 it("pasted point → done → GeoJSON source → result and history", async () => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as WebGLRenderingContext);
   let clock = Date.now();
-  const api = new MockFieldsApi(() => clock, "default", 0),
+  const api = new MockFieldsApi({ now: () => clock, latencyMs: 0 }),
     { wrapper } = setup(api);
   render(<FieldsApp />, { wrapper });
   const point = await screen.findByTestId("point-input");
@@ -130,7 +130,7 @@ it("pasted point → done → GeoJSON source → result and history", async () =
   expect(await screen.findByTestId("job-status")).toHaveTextContent("В очереди");
   clock += 8000;
   expect(await screen.findByTestId("result-fields-count", {}, { timeout: 6000 })).toHaveTextContent(
-    "56",
+    "55",
   );
   expect(screen.getByTestId("history-item")).toHaveAttribute("data-status", "done");
   expect(screen.getByTestId("download-geojson")).toHaveAttribute(

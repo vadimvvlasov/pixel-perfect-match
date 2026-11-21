@@ -255,7 +255,7 @@ const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
           m.setFeatureState({ source: "fields", id: selected }, { selected: true });
         const node = document.createElement("div");
         node.className = "field-popup";
-        node.textContent = `${formatArea(Number(field.properties["area_ha"]))} · #${field.id ?? "—"}`;
+        node.textContent = `${formatArea(Number(field.properties["area_ha"]))} · #${field.properties["id"] ?? field.id ?? "—"}`;
         new maplibregl.Popup({ closeButton: false, offset: 12 })
           .setLngLat(e.lngLat)
           .setDOMContent(node)
