@@ -7,7 +7,7 @@ import type { MapHandle, MapProps } from "./map-types";
 import { ru, formatArea, formatDate } from "@/i18n/ru";
 import { polygonBounds } from "@/lib/geometry";
 import type { ResultMeta } from "@/services/api/types";
-import { AlertTriangle } from "lucide-react";
+import { NoWebGLNotice } from "./NoWebGLNotice";
 maplibregl.setWorkerUrl(workerUrl);
 const empty: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
@@ -93,7 +93,7 @@ const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
       });
     },
     fitTo: fit,
-    zoom(delta) {
+    zoomBy(delta) {
       map.current?.zoomTo((map.current?.getZoom() ?? 6) + delta);
     },
     setLayer(name, visible) {
@@ -266,6 +266,7 @@ const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
         ? m.queryRenderedFeatures(e.point, { layers: ["cells-fill"] })[0]
         : null;
       if (cell) {
+        callbacks.current.onPoint({ lon: e.lngLat.lng, lat: e.lngLat.lat });
         callbacks.current.onResult(Number(cell.properties["id"]));
         return;
       }
@@ -289,13 +290,7 @@ const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
   }, []);
   return (
     <div className="map-host" data-testid="map" ref={container}>
-      {unavailable && (
-        <div className="webgl-notice glass">
-          <AlertTriangle />
-          <h2>{ru.webgl}</h2>
-          <p>{ru.webglHelp}</p>
-        </div>
-      )}
+      {unavailable && <NoWebGLNotice />}
     </div>
   );
 });

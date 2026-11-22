@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import FieldsApp from "@/components/fields/FieldsApp";
-import { ApiRuntime } from "@/services/api/context";
+import { ApiRuntime } from "@/services/api/runtime";
 import { ru } from "@/i18n/ru";
 export const Route = createFileRoute("/")({
   head: () => ({

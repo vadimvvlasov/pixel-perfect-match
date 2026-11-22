@@ -1,40 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import type { FieldsApi } from "./FieldsApi";
-import { API_MODE } from "./mode";
-import { ru } from "@/i18n/ru";
-const Context = createContext<FieldsApi | null>(null);
-export function ApiProvider({ children, api }: { children: ReactNode; api: FieldsApi }) {
-  return <Context.Provider value={api}>{children}</Context.Provider>;
+import { HttpFieldsApi } from "./http/HttpFieldsApi";
+
+const ApiContext = createContext<FieldsApi>(new HttpFieldsApi());
+
+/** Gives the components below another implementation (a mock, a test double); without it they use HTTP. */
+export function ApiProvider({ api, children }: { api: FieldsApi; children: ReactNode }) {
+  return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
 }
-export function useApi() {
-  const api = useContext(Context);
-  if (!api) throw new Error("ApiProvider required");
-  return api;
-}
-export function ApiRuntime({ children }: { children: ReactNode }) {
-  const [api, setApi] = useState<FieldsApi | null>(null);
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      const instance =
-        API_MODE === "mock"
-          ? await (await import("./mock/BrowserMockFieldsApi")).BrowserMockFieldsApi.create(
-              Date.now,
-              new URLSearchParams(window.location.search).get("scenario") ?? "default",
-              300,
-              window.sessionStorage,
-            )
-          : new (await import("./http/HttpFieldsApi")).HttpFieldsApi();
-      if (active) setApi(instance);
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
-  return api ? (
-    <ApiProvider api={api}>{children}</ApiProvider>
-  ) : (
-    <div className="app-loading">{ru.loading}</div>
-  );
-}
+
+/** The backend, for components. Stable for the provider's lifetime. */
+export const useApi = (): FieldsApi => useContext(ApiContext);
