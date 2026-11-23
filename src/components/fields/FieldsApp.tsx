@@ -1,123 +1,56 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowDownToLine,
-  ArrowUpRight,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  Clock3,
-  Crosshair,
-  History,
-  Info,
-  Layers,
-  Loader2,
-  MapPin,
-  Minus,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  ScanLine,
-  Search,
-  ShieldAlert,
-  Sparkles,
-  UserRound,
-  X,
-  Keyboard,
-  Satellite,
-  Copy,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { RequestDatePicker } from "./RequestDatePicker";
-import { MapPalette } from "./MapPalette";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { orderJobs } from "@/lib/job-order";
-import { ru as t, formatDate, formatRange, jobMessage } from "@/i18n/ru";
-import {
-  parsePoint,
-  pointText,
-  presetRange,
-  validateDates,
-  isoToday,
-  type Point,
-} from "@/lib/field-utils";
-import { INTERVALS_ENABLED } from "@/config";
-import { API_MODE } from "@/services/api/mode";
-import { useApi } from "@/services/api/context";
-import {
-  useMe,
-  useJobs,
-  useJob,
-  useCreateJob,
-  useResults,
-  useResult,
-  useFields,
-} from "@/services/api/hooks";
-import { AuthRequiredError, RateLimitError, ValidationError } from "@/services/api/errors";
-import { FINISHED, type Job, type JobStatus, type Bbox } from "@/services/api/types";
-import type { MapHandle } from "./map-types";
+import { ArrowUpRight, Info, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ru as t } from "@/i18n/ru";
+import { validateDates } from "@/lib/field-utils";
+import { formatLatLon, parseCoords, type LonLat } from "@/lib/geo";
+import { INTERVALS_ENABLED } from "@/config";
+import { isMock } from "@/services/api/mode";
+import { AuthRequiredError, FINISHED, useApi, type Bbox, type Job } from "@/services/api";
+import { useCreateJob, useFields, useJob, useJobs, useMe, useResult, useResults } from "@/services/api/hooks";
+import type { MapHandle } from "./map-types";
+import { SidePanel, type Snap } from "./SidePanel";
+import { PointForm } from "./PointForm";
+import { DatesInput } from "./DatesInput";
+import { SubmitArea } from "./SubmitArea";
+import { JobStatusCard } from "./JobStatusCard";
+import { ResultCard } from "./ResultCard";
+import { HistoryList } from "./HistoryList";
+import { MapChrome, type LayerName } from "./MapChrome";
+import { CursorPill } from "./CursorPill";
+import { MapPalette } from "./MapPalette";
+import { ShortcutsDialog } from "./ShortcutsDialog";
+
 const MapView = lazy(() => import("./MapView"));
-export function Status({ status }: { status: JobStatus }) {
-  return (
-    <Badge variant="outline" className={`status status-${status}`}>
-      <span className="status-dot" />
-      <span>{t.status[status]}</span>
-    </Badge>
-  );
-}
+
+/** The container: state, API hooks and the map handle; every view is its own component. */
 export default function FieldsApp() {
-  const api = useApi(),
-    client = useQueryClient(),
-    map = useRef<MapHandle>(null),
-    input = useRef<HTMLInputElement>(null);
-  const me = useMe(),
-    jobs = useJobs(),
-    create = useCreateJob();
-  const [seed, setSeed] = useState<Job | null>(null),
-    current = useJob(seed);
+  const api = useApi(), client = useQueryClient();
+  const map = useRef<MapHandle>(null), input = useRef<HTMLInputElement>(null);
+  const me = useMe(), jobs = useJobs(), create = useCreateJob();
+  const [seed, setSeed] = useState<Job | null>(null), current = useJob(seed);
   const job = current.data ?? seed;
-  const [point, setPoint] = useState<Point | null>(null),
-    [text, setText] = useState(""),
-    [pointError, setPointError] = useState("");
-  const [date, setDate] = useState("2021-07-15"),
-    [start, setStart] = useState("2021-03-01"),
-    [end, setEnd] = useState("2021-09-30"),
-    [interval, setInterval] = useState(false);
-  const [collapsed, setCollapsed] = useState(false),
-    [snap, setSnap] = useState("half");
-  const [bbox, setBbox] = useState<Bbox>([-180, -90, 180, 90]),
-    results = useResults(bbox);
-  const [resultId, setResultId] = useState<number | null>(null),
-    result = useResult(resultId),
-    fields = useFields(resultId);
-  const [mapReady, setMapReady] = useState(false),
-    [cursor, setCursor] = useState({ lat: 42, lon: -93.6, zoom: 6 }),
-    [copied, setCopied] = useState(false);
-  const [layerOpen, setLayerOpen] = useState(false),
-    [layers, setLayers] = useState({ fields: true, cells: true, labels: true });
-  const [modal, setModal] = useState<"search" | "help" | null>(null),
-    [search, setSearch] = useState("");
+  const [point, setPoint] = useState<LonLat | null>(null), [text, setText] = useState(""), [pointError, setPointError] = useState("");
+  const [date, setDate] = useState("2021-07-15"), [start, setStart] = useState("2021-03-01"), [end, setEnd] = useState("2021-09-30");
+  const [interval, setInterval] = useState(false);
+  const [collapsed, setCollapsed] = useState(false), [snap, setSnap] = useState<Snap>("half");
+  const [bbox, setBbox] = useState<Bbox>([-180, -90, 180, 90]), results = useResults(bbox);
+  const [resultId, setResultId] = useState<number | null>(null), result = useResult(resultId), fields = useFields(resultId);
+  const [mapReady, setMapReady] = useState(false), [cursor, setCursor] = useState({ lat: 42, lon: -93.6, zoom: 6 });
+  const [layersOpen, setLayersOpen] = useState(false), [layers, setLayers] = useState({ fields: true, cells: true, labels: true });
+  const [modal, setModal] = useState<"search" | "help" | null>(null), [search, setSearch] = useState("");
   const [scenario, setScenario] = useState("default");
-  const notified = useRef<number | null>(null),
-    displayed = useRef<number | null>(null);
+  const notified = useRef<number | null>(null), displayed = useRef<number | null>(null);
+
   const dateError = validateDates(interval ? start : date, interval ? end : date);
   const running = !!job && !FINISHED.includes(job.status);
-  const auth = [
-    me.error,
-    jobs.error,
-    current.error,
-    create.error,
-    result.error,
-    fields.error,
-    results.error,
-  ].some((e) => e instanceof AuthRequiredError);
-  useEffect(() => {
-    setScenario(new URLSearchParams(window.location.search).get("scenario") ?? "default");
-  }, []);
+  const auth = [me.error, jobs.error, current.error, create.error, result.error, fields.error, results.error].some((e) => e instanceof AuthRequiredError);
+
+  useEffect(() => setScenario(new URLSearchParams(window.location.search).get("scenario") ?? "default"), []);
   useEffect(() => {
     const active = jobs.data?.find((j) => !FINISHED.includes(j.status));
     if (!seed && active) setSeed(active);
@@ -143,696 +76,150 @@ export default function FieldsApp() {
   useEffect(() => {
     if (point && mapReady) map.current?.placeMarker(point);
   }, [point, mapReady]);
+
   const newRequest = () => {
-    setSeed(null);
-    setPoint(null);
-    setText("");
-    setPointError("");
-    create.reset();
-    setCollapsed(false);
+    setSeed(null); setPoint(null); setText(""); setPointError("");
+    create.reset(); setCollapsed(false);
     setTimeout(() => input.current?.focus(), 50);
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      const target = e.target;
-      const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") || (!typing && e.key === "/")) {
-        e.preventDefault();
-        setModal("search");
-      }
-      if (e.key === "Escape") {
-        setModal(null);
-        setLayerOpen(false);
-      }
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") || (!typing && e.key === "/")) { e.preventDefault(); setModal("search"); }
+      if (e.key === "Escape") { setModal(null); setLayersOpen(false); }
       if (!typing && e.key.toLowerCase() === "n") newRequest();
       if (!typing && e.key === "?") setModal("help");
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
-  const choose = (p: Point, fly = false) => {
-    setPoint(p);
-    setText(pointText(p));
-    setPointError("");
+
+  const choose = (p: LonLat, fly = false) => {
+    setPoint(p); setText(formatLatLon(p)); setPointError("");
     map.current?.placeMarker(p, fly);
   };
   const parse = (v: string) => {
-    if (!v.trim()) {
-      setPoint(null);
-      setPointError("");
-      return;
-    }
-    const p = parsePoint(v);
+    if (!v.trim()) { setPoint(null); setPointError(""); return; }
+    const p = parseCoords(v);
     if (p) choose(p, true);
-    else {
-      setPointError(t.coordinateError);
-      setPoint(null);
-    }
+    else { setPointError(t.coordinateError); setPoint(null); }
   };
   const submit = () => {
     if (!point || dateError || running) return;
     create.mutate(
       { ...point, start: interval ? start : date, end: interval ? end : date },
-      {
-        onSuccess: (j) => {
-          setSeed(j);
-          notified.current = null;
-        },
-      },
+      { onSuccess: (j) => { setSeed(j); notified.current = null; } },
     );
   };
   const selectJob = (j: Job) => {
     setSeed(j);
     choose({ lat: j.lat, lon: j.lon });
-    setDate(j.date);
-    setStart(j.start_date);
-    setEnd(j.end_date);
+    setDate(j.date); setStart(j.start_date); setEnd(j.end_date);
     setInterval(j.start_date !== j.end_date);
     if (j.result_id !== null) {
       displayed.current = null;
       setResultId(j.result_id);
-      if (result.data?.id === j.result_id && fields.data)
-        map.current?.showResult(result.data, fields.data);
+      if (result.data?.id === j.result_id && fields.data) map.current?.showResult(result.data, fields.data);
     }
   };
   const searchGo = () => {
-    const p = parsePoint(search);
-    if (p) {
-      choose(p, true);
-      setModal(null);
-      return;
-    }
-    const cell = results.data?.find((r) =>
-      r.cell.toLowerCase().includes(search.trim().toLowerCase()),
-    );
-    if (cell) {
-      map.current?.fitTo(cell.cell_geom);
-      setResultId(cell.id);
-      setModal(null);
-    } else toast.error(t.noResults);
+    const p = parseCoords(search);
+    if (p) { choose(p, true); setModal(null); return; }
+    const cell = results.data?.find((r) => r.cell.toLowerCase().includes(search.trim().toLowerCase()));
+    if (cell) { map.current?.fitTo(cell.cell_geom); setResultId(cell.id); setModal(null); }
+    else toast.error(t.noResults);
   };
-  const disabledReason = create.isPending ? t.loading : running ? t.calculating : (dateError ?? (!point ? t.choosePoint : ""));
-  const toggleLayer = (name: keyof typeof layers) => {
+  const toggleLayer = (name: LayerName) => {
     const next = !layers[name];
     setLayers({ ...layers, [name]: next });
     map.current?.setLayer(name, next);
   };
-  const err = create.error;
+  const disabledReason = create.isPending ? t.loading : running ? t.calculating : (dateError ?? (!point ? t.choosePoint : ""));
+
   return (
     <TooltipProvider delayDuration={200}>
-    <main className={`app-shell snap-${snap} ${collapsed ? "panel-collapsed" : ""}`}>
-      <ClientOnly fallback={<div className="map-host" />}>
-        <Suspense fallback={<div className="map-host" />}>
-          <MapView
-            ref={map}
-            onPoint={(p) => choose(p)}
-            onCursor={(p, z) => setCursor({ ...p, zoom: z })}
-            onBounds={setBbox}
-            onResult={(id) => {
-              displayed.current = null;
-              setResultId(id);
-            }}
-            onReady={() => setMapReady(true)}
-          />
-        </Suspense>
-      </ClientOnly>
-      {!collapsed ? (
-        <aside className={`side-panel glass snap-${snap}`}>
-          <Button
-            variant="ghost"
-            className="mobile-handle"
-            onPointerDown={(e) => {
-              e.currentTarget.dataset["startY"] = String(e.clientY);
-              e.currentTarget.setPointerCapture(e.pointerId);
-            }}
-            onPointerUp={(e) => {
-              const delta = e.clientY - Number(e.currentTarget.dataset["startY"]);
-              if (Math.abs(delta) > 25) {
-                setSnap(delta < 0 ? "full" : "peek");
-                e.preventDefault();
-              }
-            }}
-            aria-label={t.expand}
-            onClick={() => setSnap((s) => (s === "half" ? "full" : s === "full" ? "peek" : "half"))}
-          >
-            <span />
-          </Button>
-          <header className="panel-header">
-            <div className="brand">
-              <div className="brand-symbol">
-                <ScanLine strokeWidth={1.5} />
-              </div>
-              <div>
-                <h1>{t.title}</h1>
-                <div className="brand-subtitle">{t.subtitle}</div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="panel-collapse"
-                title={t.collapse}
-                aria-label={t.collapse}
-                onClick={() => setCollapsed(true)}
-              >
-                <PanelLeftClose />
+      <main className={`app-shell snap-${snap} ${collapsed ? "panel-collapsed" : ""}`}>
+        <ClientOnly fallback={<div className="map-host" />}>
+          <Suspense fallback={<div className="map-host" />}>
+            <MapView
+              ref={map}
+              onPoint={(p) => choose(p)}
+              onCursor={(p, z) => setCursor({ ...p, zoom: z })}
+              onBounds={setBbox}
+              onResult={(id) => { displayed.current = null; setResultId(id); }}
+              onReady={() => setMapReady(true)}
+            />
+          </Suspense>
+        </ClientOnly>
+        <SidePanel
+          collapsed={collapsed}
+          snap={snap}
+          email={me.data?.email ?? (me.isPending ? t.loading : "—")}
+          onSnap={setSnap}
+          onCollapse={setCollapsed}
+          onNew={newRequest}
+        >
+          {auth ? (
+            <div className="auth-notice">
+              <ShieldAlert />
+              <h2>{t.auth}</h2>
+              <Button asChild variant="outline" className="mt-4">
+                <a href="/login">{t.login}<ArrowUpRight /></a>
               </Button>
             </div>
-          </header>
-          <div className="panel-content">
-            {auth ? (
-              <div className="auth-notice">
-                <ShieldAlert />
-                <h2>{t.auth}</h2>
-                <Button asChild variant="outline" className="mt-4">
-                  <a href="/login">
-                    {t.login}
-                    <ArrowUpRight />
-                  </a>
-                </Button>
-              </div>
-            ) : (
-              <>
-                <p className="explanation">{t.explanation}</p>
-                <div className="model-note">
-                  <Info />
-                  <span>{t.warning}</span>
-                </div>
-                <section>
-                  <h2 className="section-title">
-                    <MapPin />
-                    {t.where}
-                    <span className="section-number">01</span>
-                  </h2>
-                  <label htmlFor="point" className="point-label">
-                    {t.point}
-                  </label>
-                  <div className="point-entry">
-                    <input
-                      id="point"
-                      ref={input}
-                      className="field-input font-mono"
-                      data-testid="point-input"
-                      value={text}
-                      placeholder={t.placeholder}
-                      onChange={(e) => {
-                        setText(e.target.value);
-                        setPoint(null);
-                      }}
-                      onBlur={() => parse(text)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") parse(text);
-                      }}
-                      onPaste={(e) => {
-                        e.preventDefault();
-                        const v = e.clipboardData.getData("text");
-                        setText(v);
-                        parse(v);
-                      }}
-                    />
-                    <Crosshair className="input-cross" />
-                  </div>
-                  {pointError && <p className="error-text">{pointError}</p>}
-                </section>
-                <section className="date-section">
-                  <h2 className="section-title">
-                    <CalendarDays />
-                    {t.when}
-                    <span className="section-number">02</span>
-                  </h2>
-                  <ToggleGroup className="segment" type="single" value={interval ? "interval" : "one"} onValueChange={(value) => {
-                    if (!value) return;
-                    setInterval(value === "interval");
-                    if (value === "interval") { const r = presetRange(date); setStart(r.start); setEnd(r.end); }
-                  }}>
-                    <ToggleGroupItem
-                      value="one"
-                      className={!interval ? "is-active" : "is-inactive"}
-                      onClick={() => {
-                        setInterval(false);
-                      }}
-                    >
-                      {t.single}
-                    </ToggleGroupItem>
-                    <Tooltip><TooltipTrigger asChild><span className="flex" tabIndex={!INTERVALS_ENABLED ? 0 : -1}>
-                      <ToggleGroupItem
-                        value="interval"
-                        className={interval ? "is-active w-full" : "is-inactive w-full"}
-                        disabled={!INTERVALS_ENABLED}
-                        onClick={() => {
-                          setInterval(true);
-                          const r = presetRange(date);
-                          setStart(r.start);
-                          setEnd(r.end);
-                        }}
-                      >
-                        {t.interval}
-                      </ToggleGroupItem>
-                    </span></TooltipTrigger>{!INTERVALS_ENABLED && <TooltipContent>{t.intervalDisabled}</TooltipContent>}</Tooltip>
-                  </ToggleGroup>
-                  {!interval ? (
-                    <div className="date-entry">
-                      <RequestDatePicker start={date} onStart={setDate} />
-                      <input
-                        className="sr-only"
-                        type="date"
-                        min="2017-01-01"
-                        max={isoToday()}
-                        aria-label={t.date}
-                        data-testid="date-input"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="range-inputs sr-only">
-                        <div>
-                          <label className="point-label" htmlFor="start">
-                            {t.start}
-                          </label>
-                          <input
-                            id="start"
-                            type="date"
-                            className="field-input"
-                            data-testid="interval-start"
-                            min="2017-01-01"
-                            max={isoToday()}
-                            value={start}
-                            onChange={(e) => setStart(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="point-label" htmlFor="end">
-                            {t.end}
-                          </label>
-                          <input
-                            id="end"
-                            type="date"
-                            className="field-input"
-                            data-testid="interval-end"
-                            min="2017-01-01"
-                            max={isoToday()}
-                            value={end}
-                            onChange={(e) => setEnd(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="presets">
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            const r = presetRange(date);
-                            setStart(r.start);
-                            setEnd(r.end);
-                          }}
-                        >
-                          {t.season(Number(date.slice(0, 4)))}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            const r = presetRange(date, true);
-                            setStart(r.start);
-                            setEnd(r.end);
-                          }}
-                        >
-                          {t.year(Number(date.slice(0, 4)))}
-                        </Button>
-                      </div>
-                      <RequestDatePicker range start={start} end={end} onStart={setStart} onEnd={setEnd} />
-                    </>
-                  )}
-                  {dateError && <div className="error-text">{dateError}</div>}
-                </section>
-                <div className="submit-area">
-                  <Tooltip><TooltipTrigger asChild><div tabIndex={disabledReason ? 0 : -1}>
-                    <Button
-                      className="submit-button"
-                      data-testid="submit"
-                      disabled={!!disabledReason || create.isPending}
-                      onClick={submit}
-                    >
-                      {running || create.isPending ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <Sparkles />
-                      )}
-                      {t.submit}
-                      {!running && <ArrowUpRight className="ml-auto" />}
-                    </Button>
-                  </div></TooltipTrigger>{disabledReason && <TooltipContent>{disabledReason}</TooltipContent>}</Tooltip>
-                  <div className="submit-hint">
-                    <Clock3 />
-                    {t.progress}
-                  </div>
-                  {err && !(err instanceof AuthRequiredError) && (
-                    <div className="error-text">
-                      {err instanceof RateLimitError ? t.rateLimit : err instanceof ValidationError
-                        ? dateError ?? t.dateInvalid
-                        : t.networkError}
-                      {!(err instanceof RateLimitError || err instanceof ValidationError) && (
-                        <Button variant="link" size="sm" onClick={submit}>
-                          {t.retry}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {job && (
-                  <section className="job-block">
-                    <div className="job-heading">
-                      <span data-testid="job-status">
-                        <Status status={job.status} />
-                      </span>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        #{job.id.toString().padStart(3, "0")}
-                      </span>
-                    </div>
-                    {running && (
-                      <div className="job-progress">
-                        <span />
-                      </div>
-                    )}
-                    <div className="job-meta">
-                      {job.cell && (
-                        <>
-                          <span className="font-mono">
-                            {t.cell} {job.cell}
-                          </span>
-                          <br />
-                        </>
-                      )}
-                      {job.scene_date && (
-                        <>
-                          {t.scene} {formatDate(job.scene_date)}
-                          <br />
-                        </>
-                      )}
-                      {job.start_date !== job.end_date && (
-                        <>
-                          {t.interval} {formatRange(job.start_date, job.end_date)}
-                          <br />
-                        </>
-                      )}
-                      <span data-testid="job-message">{jobMessage(job.message)}</span>
-                      {current.failureCount > 0 && (
-                        <div className="text-warning">{t.disconnected}</div>
-                      )}
-                    </div>
-                  </section>
-                )}
-                {resultId !== null && (
-                  <section className="result-block" data-testid="result-panel">
-                    {result.isPending || fields.isPending ? (
-                      <>
-                        <div className="skeleton-line" />
-                        <div className="skeleton-line" />
-                      </>
-                    ) : result.error || fields.error ? (
-                      <>
-                        <p className="error-text">{t.networkError}</p>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            void result.refetch();
-                            void fields.refetch();
-                          }}
-                        >
-                          {t.retry}
-                        </Button>
-                      </>
-                    ) : (
-                      result.data && (
-                        <>
-                          <div className="result-header">
-                            <Check size={15} />
-                            {t.resultsReady}
-                          </div>
-                          <div className="job-meta font-mono">{result.data.cell}</div>
-                          <div className="job-meta">
-                            {t.scene} {formatDate(result.data.scene_date)}
-                          </div>
-                          <div className="result-number">
-                            <span data-testid="result-fields-count">{result.data.n_fields}</span>{" "}
-                            <small>{t.fields}</small>
-                          </div>
-                          <div className="job-meta">
-                            {t.model} <span className="font-mono">{result.data.model_version}</span>
-                          </div>
-                          <Button asChild variant="outline" className="result-download">
-                            <a
-                              data-testid="download-geojson"
-                              href={api.downloadUrl(result.data.id)}
-                              download={`${result.data.cell}.geojson`}
-                            >
-                              <ArrowDownToLine />
-                              {t.download}
-                            </a>
-                          </Button>
-                        </>
-                      )
-                    )}
-                  </section>
-                )}
-                <section className="history-section">
-                  <div className="history-heading">
-                    <h2 className="section-title">
-                      <History className="!text-muted-foreground" />
-                      {t.history}
-                    </h2>
-                    <span className="history-counter">{jobs.data?.length ?? 0}</span>
-                  </div>
-                  {jobs.isPending ? (
-                    <div className="skeleton-line" />
-                  ) : jobs.error ? (
-                    <>
-                      <p className="error-text">{t.networkError}</p>
-                      <Button variant="outline" onClick={() => void jobs.refetch()}>
-                        {t.retry}
-                      </Button>
-                    </>
-                  ) : !jobs.data?.length ? (
-                    <div className="history-empty">
-                      <ScanLine />
-                      <span>{t.emptyHistory}</span>
-                    </div>
-                  ) : (
-                    orderJobs(jobs.data).map((j) => (
-                      <Button
-                        key={j.id}
-                        variant="ghost"
-                        className="history-row"
-                        data-testid="history-item"
-                        data-status={j.status}
-                        onClick={() => selectJob(j)}
-                      >
-                        <div className="history-text">
-                          {formatRange(j.start_date, j.end_date)}
-                          <span>{j.cell ?? `${j.lat.toFixed(4)}, ${j.lon.toFixed(4)}`}</span>
-                        </div>
-                        <Status status={j.status} />
-                        <ChevronRight size={12} />
-                      </Button>
-                    ))
-                  )}
-                </section>
-              </>
-            )}
-          </div>
-          <footer className="panel-footer">
-            <div className="avatar">
-              <UserRound />
-            </div>
-            <div>
-              <div className="account-email" data-testid="user-email">
-                {me.data?.email ?? (me.isPending ? t.loading : "—")}
-              </div>
-              <div className="account-role">{t.account}</div>
-            </div>
-            <span className="connection-dot" />
-          </footer>
-        </aside>
-      ) : (
-        <nav className="rail glass">
-          <div className="brand-symbol">
-            <ScanLine />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t.expand}
-            title={t.expand}
-            onClick={() => setCollapsed(false)}
-          >
-            <PanelLeftOpen />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t.newRequest}
-            title={t.newRequest}
-            onClick={newRequest}
-          >
-            <Plus />
-          </Button>
-        </nav>
-      )}
-      <div className="map-topbar">
-        <div className="map-source glass">
-          <Satellite />
-          <div>
-            <strong>{t.satellite}</strong>
-            <small>{t.satelliteSource}</small>
-          </div>
-        </div>
-        <div className="map-top-right">
-          {API_MODE === "mock" && (
-            <div className="mock-pill glass">
-              {t.demo} · {scenario}
-            </div>
+          ) : (
+            <>
+              <p className="explanation">{t.explanation}</p>
+              <div className="model-note"><Info /><span>{t.warning}</span></div>
+              <PointForm inputRef={input} text={text} error={pointError} onText={(v) => { setText(v); setPoint(null); }} onParse={parse} />
+              <DatesInput
+                interval={interval}
+                intervalsEnabled={INTERVALS_ENABLED}
+                date={date}
+                start={start}
+                end={end}
+                error={dateError}
+                onInterval={setInterval}
+                onDate={setDate}
+                onRange={(s, e) => { setStart(s); setEnd(e); }}
+              />
+              <SubmitArea disabledReason={disabledReason} busy={create.isPending} running={running} error={create.error} dateError={dateError} onSubmit={submit} />
+              {job && <JobStatusCard job={job} disconnected={current.failureCount > 0} />}
+              {resultId !== null && (
+                <ResultCard
+                  result={result.data}
+                  pending={result.isPending || fields.isPending}
+                  failed={!!(result.error || fields.error)}
+                  downloadUrl={(id) => api.downloadUrl(id)}
+                  onRetry={() => { void result.refetch(); void fields.refetch(); }}
+                />
+              )}
+              <HistoryList jobs={jobs.data} pending={jobs.isPending} failed={!!jobs.error} onRetry={() => void jobs.refetch()} onSelect={selectJob} />
+            </>
           )}
-          <Button
-            variant="ghost"
-            className="search-button glass"
-            onClick={() => setModal("search")}
-            aria-label={t.search}
-          >
-            <Search />
-            <span>{t.search}</span>
-            <kbd>⌘ K</kbd>
-          </Button>
-        </div>
-      </div>
-      <div className="map-tools">
-        <div className="tool-group glass">
-          <Button
-            variant="ghost"
-            size="icon"
-            title={t.zoomIn}
-            aria-label={t.zoomIn}
-            onClick={() => map.current?.zoom(1)}
-          >
-            <Plus />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title={t.zoomOut}
-            aria-label={t.zoomOut}
-            onClick={() => map.current?.zoom(-1)}
-          >
-            <Minus />
-          </Button>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="tool-single glass"
-          title={t.layers}
-          aria-label={t.layers}
-          onClick={() => setLayerOpen(!layerOpen)}
-        >
-          <Layers />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="tool-single glass"
-          title={t.locate}
-          aria-label={t.locate}
-          onClick={() => point && map.current?.placeMarker(point, true)}
-        >
-          <Crosshair />
-        </Button>
-        {layerOpen && (
-          <div className="layers-popover glass">
-            <h3>{t.layers}</h3>
-            {(["fields", "cells", "labels"] as const).map((name) => (
-              <label className="layer-row" key={name}>
-                <span className={`swatch swatch-${name}`} />
-                {name === "fields" ? t.fieldLayer : name === "cells" ? t.cellLayer : t.labels}
-                <input type="checkbox" checked={layers[name]} onChange={() => toggleLayer(name)} />
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="map-bottom">
-        <div className="map-legend glass">
-          {layers.fields && result.data && (
-            <div>
-              <span className="swatch swatch-fields" />
-              {t.fieldLayer}
-            </div>
-          )}
-          {layers.cells && cursor.zoom >= 7 && !!results.data?.length && (
-            <div>
-              <span className="swatch swatch-cells" />
-              {t.cellLayer}
-            </div>
-          )}
-          {result.data && (
-            <div>
-              <span className="swatch swatch-selected" />
-              {t.selected}
-            </div>
-          )}
-        </div>
-        <div className="bottom-help">
-          <div className="scale-block">
-            {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
-              (80 * 156.543 * Math.cos((cursor.lat * Math.PI) / 180)) / 2 ** cursor.zoom,
-            )}{" "}
-            {t.scale}
-            <div className="scale-line" />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="tool-single glass"
-            aria-label={t.shortcuts}
-            title={t.shortcuts}
-            onClick={() => setModal("help")}
-          >
-            <Keyboard />
-          </Button>
-        </div>
-      </div>
-      <Button
-        variant="ghost"
-        className="cursor-pill glass"
-        data-testid="cursor-pill"
-        title={t.copy}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(pointText(cursor));
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1800);
-          } catch {
-            toast.error(t.networkError);
-          }
-        }}
-      >
-        {copied ? <Check /> : <Copy />}
-        {copied ? t.copied : `${pointText(cursor)} · ${t.zoom} ${cursor.zoom.toFixed(1)}`}
-      </Button>
-      <MapPalette open={modal === "search"} onClose={() => setModal(null)} search={search} onSearch={setSearch} onGo={searchGo} jobs={jobs.data ?? []} onJob={selectJob} />
-      {modal === "help" && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="command-modal glass" role="dialog" aria-modal="true" aria-label={t.shortcuts} onClick={(e) => e.stopPropagation()}>
-            <div className="command-header">
-              <Keyboard /><h2>{t.shortcuts}</h2>
-              <Button variant="ghost" size="icon" aria-label={t.close} onClick={() => setModal(null)}><X /></Button>
-            </div>
-            <div className="command-body">
-              {[[t.helpNew, "N"], [t.helpSearch, "⌘ K / /"], [t.helpClose, "Esc"]].map(([label, key]) => (
-                <div className="shortcut-row" key={key}><span>{label}</span><kbd>{key}</kbd></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
+        </SidePanel>
+        <MapChrome
+          scenario={isMock() ? scenario : null}
+          layers={layers}
+          layersOpen={layersOpen}
+          legend={{
+            fields: layers.fields && !!result.data,
+            cells: layers.cells && cursor.zoom >= 7 && !!results.data?.length,
+            selected: !!result.data,
+          }}
+          lat={cursor.lat}
+          zoom={cursor.zoom}
+          onSearch={() => setModal("search")}
+          onHelp={() => setModal("help")}
+          onZoom={(d) => map.current?.zoomBy(d)}
+          onLocate={() => point && map.current?.placeMarker(point, true)}
+          onLayersOpen={setLayersOpen}
+          onToggleLayer={toggleLayer}
+        />
+        <CursorPill cursor={cursor} zoom={cursor.zoom} />
+        <MapPalette open={modal === "search"} onClose={() => setModal(null)} search={search} onSearch={setSearch} onGo={searchGo} jobs={jobs.data ?? []} onJob={selectJob} />
+        <ShortcutsDialog open={modal === "help"} onClose={() => setModal(null)} />
+      </main>
     </TooltipProvider>
   );
 }

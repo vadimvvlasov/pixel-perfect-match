@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parsePoint, validateDates, presetRange } from "@/lib/field-utils";
+import { validateDates, presetRange } from "@/lib/field-utils";
+import { parseCoords as parsePoint } from "@/lib/geo";
 import { BrowserMockFieldsApi } from "@/services/api/mock/BrowserMockFieldsApi";
 import { MockFieldsApi } from "@/services/api/mock/MockFieldsApi";
 import {

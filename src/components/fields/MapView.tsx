@@ -5,7 +5,7 @@ import type { GeoJSONSource, Map as LibreMap } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { MapHandle, MapProps } from "./map-types";
 import { ru, formatArea, formatDate } from "@/i18n/ru";
-import { polygonBounds } from "@/lib/geometry";
+import { polygonBounds } from "@/lib/geo";
 import type { ResultMeta } from "@/services/api/types";
 import { NoWebGLNotice } from "./NoWebGLNotice";
 maplibregl.setWorkerUrl(workerUrl);
@@ -82,7 +82,7 @@ const MapView = forwardRef<MapHandle, MapProps>(function MapView(props, ref) {
           features.push({
             type: "Feature",
             properties: {
-              label: `${r.cell} · ${formatDate(r.scene_date, true)} · ${r.n_fields ?? "—"} ${ru.fields}`,
+              label: `${r.cell} · ${(r.scene_date ? formatDate(r.scene_date, true) : "—")} · ${r.n_fields ?? "—"} ${ru.fields}`,
             },
             geometry: { type: "Point", coordinates: [(b[0] + b[2]) / 2, b[3]] },
           });

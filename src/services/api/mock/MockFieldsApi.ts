@@ -1,4 +1,5 @@
 import { AuthRequiredError, NetworkError, NotFoundError, RateLimitError, ValidationError } from "../errors";
+import { dateWindow } from "@/lib/window";
 import type { FieldsApi } from "../FieldsApi";
 import type { Bbox, Job, JobRequest, JobStatus, Me, ResultMeta } from "../types";
 
@@ -36,7 +37,12 @@ interface StoredResult extends ResultMeta {
   createdBy: number; // the job that computed it; later jobs for the same cell and scene reuse it
 }
 
-interface StoredJob extends JobRequest {
+interface StoredJob {
+  lon: number;
+  lat: number;
+  start: string;
+  end: string;
+  date?: string;
   id: number;
   createdAt: number;
   requestedBy: string;
@@ -73,7 +79,9 @@ export class MockFieldsApi implements FieldsApi {
 
   async createJob(r: JobRequest): Promise<Job> {
     await this.enter();
-    const { lon, lat, start, end } = r;
+    const { lon, lat } = r;
+    const one = "date" in r ? r.date : undefined;
+    const { start, end } = "date" in r ? dateWindow(r.date, new Date(this.now()).toISOString().slice(0, 10)) : r;
     if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90) {
       throw new ValidationError("lon/lat out of range", 400);
     }
@@ -88,7 +96,7 @@ export class MockFieldsApi implements FieldsApi {
     if (this.scenario === "rate-limited" || active >= MAX_ACTIVE) {
       throw new RateLimitError(`at most ${MAX_ACTIVE} jobs in progress per user`, 429);
     }
-    const job: StoredJob = { id: this.jobs.length + 1, lon, lat, start, end, createdAt: this.now(), requestedBy: this.email };
+    const job: StoredJob = { id: this.jobs.length + 1, lon, lat, start, end, ...(one ? { date: one } : {}), createdAt: this.now(), requestedBy: this.email };
     this.jobs.push(job);
     return this.view(job);
   }
@@ -156,7 +164,7 @@ export class MockFieldsApi implements FieldsApi {
       id: j.id,
       lon: j.lon,
       lat: j.lat,
-      date: j.start,
+      date: j.date ?? j.start,
       start_date: j.start,
       end_date: j.end,
       status,

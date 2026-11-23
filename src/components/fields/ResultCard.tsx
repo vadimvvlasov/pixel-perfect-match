@@ -35,7 +35,7 @@ export function ResultCard({ result, pending, failed, downloadUrl, onRetry }: Re
             </div>
             <div className="job-meta font-mono">{result.cell}</div>
             <div className="job-meta">
-              {t.scene} {formatDate(result.scene_date)}
+              {t.scene} {result.scene_date ? formatDate(result.scene_date) : "—"}
             </div>
             <div className="result-number">
               <span data-testid="result-fields-count">{result.n_fields}</span> <small>{t.fields}</small>

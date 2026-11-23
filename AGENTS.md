@@ -38,3 +38,7 @@ use the editor.
 - Define Tailwind v4 tokens in global CSS, not a legacy Tailwind config, because the CSS-first compiler does not load it.
 - Keep request date rules and presets in lib/dates.ts and order active history jobs before finished jobs, so UI and service validation agree.
 - The API guard excludes the required template server entry because its fetch method is the host handler, not an outgoing network request.
+- FieldsApp is a thin container; each view is its own props-driven component under components/fields with tests in src/test/components.test.tsx, so a port is file for file.
+- services/api/context.tsx and index.ts are verbatim (HTTP default); mock wiring lives in runtime.tsx/mode.ts so the supplied files stay untouched.
+- Coordinates and polygon bounds live only in lib/geo.ts; one-date windows only in lib/window.ts, shared by the mock and UI.
+- Only shadcn primitives the app imports are kept; /_design shows the app's own components, not unused primitives.
